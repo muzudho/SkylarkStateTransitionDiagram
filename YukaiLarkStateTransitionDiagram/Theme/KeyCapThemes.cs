@@ -4,8 +4,9 @@ using System.Collections.Generic;
 
 public static class KeyCapThemes
 {
-    public static IKeyCapTheme Current => Office;
+    public static IKeyCapTheme Current => YukaiLark;
 
+    public static IKeyCapTheme YukaiLark { get; } = new YukaiLarkKeyCapTheme();
     public static IKeyCapTheme Office { get; } = new OfficeKeyCapTheme();
     public static IKeyCapTheme Gaming { get; } = new GamingKeyCapTheme();
     public static IKeyCapTheme Retro { get; } = new RetroKeyCapTheme();
@@ -19,7 +20,7 @@ public static class KeyCapThemes
 
     public static IReadOnlyList<IKeyCapTheme> ShortcutThemes { get; } =
     [
-        Office,
+        YukaiLark,
         Gaming,
         Retro,
         CopyPaper,

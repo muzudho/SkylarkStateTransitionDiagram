@@ -2043,6 +2043,7 @@ public static class BoardThemes
     public static BoardTheme ForKeyCapTheme(IKeyCapTheme keyCapTheme)
         => keyCapTheme.Name switch
         {
+            "YukaiLark" => new BoardTheme(new Color(238, 250, 239), new Color(178, 219, 203), new Color(222, 244, 233), new Color(255, 253, 239), new Color(233, 188, 96), new Color(83, 178, 176)),
             "Gaming" => new BoardTheme(new Color(18, 20, 28), new Color(42, 88, 96), new Color(15, 18, 24), new Color(230, 236, 232), new Color(78, 104, 108), new Color(88, 232, 206)),
             "Retro" => new BoardTheme(new Color(116, 82, 52), new Color(149, 109, 70), new Color(98, 65, 40), new Color(241, 229, 198), new Color(155, 125, 82), new Color(190, 54, 44)),
             "CopyPaper" => new BoardTheme(new Color(226, 229, 224), new Color(198, 205, 202), new Color(190, 185, 174), new Color(252, 250, 242), new Color(190, 184, 172), new Color(60, 112, 178)),
