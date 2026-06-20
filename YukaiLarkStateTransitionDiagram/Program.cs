@@ -1,4 +1,4 @@
-namespace SkylarkStateTransitionDiagram;
+namespace YukaiLarkStateTransitionDiagram;
 
 internal static class Program
 {

@@ -1,6 +1,6 @@
 # Docs
 
-このフォルダーは、SkylarkStateTransitionDiagram の説明書、設計メモ、作業再開メモを置く場所です。
+このフォルダーは、YukaiLarkStateTransitionDiagram の説明書、設計メモ、作業再開メモを置く場所です。
 
 ## 案内板
 

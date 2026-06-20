@@ -1,5 +1,5 @@
-namespace SkylarkStateTransitionDiagram;
-using SkylarkStateTransitionDiagram.Theme;
+namespace YukaiLarkStateTransitionDiagram;
+using YukaiLarkStateTransitionDiagram.Theme;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -112,7 +112,7 @@ public class Game1 : Game
         Content.RootDirectory = "Content";
         IsMouseVisible = true;
         Window.AllowUserResizing = true;
-        Window.Title = "Skylark State Transition Diagram";
+        Window.Title = "YukaiLark State Transition Diagram";
         Window.TextInput += OnTextInput;
     }
     protected override void Initialize()
@@ -1485,7 +1485,7 @@ public class Game1 : Game
         var bounds = new Rectangle(0, 0, width, 58);
         _spriteBatch.Draw(_pixel, bounds, new Color(17, 19, 23, 238));
         _spriteBatch.Draw(_pixel, new Rectangle(0, bounds.Height - 1, width, 1), new Color(65, 72, 84));
-        DrawUiText("Skylark State Transition Diagram", new Vector2(12, 8), new Color(245, 247, 250), 18, true);
+        DrawUiText("YukaiLark State Transition Diagram", new Vector2(12, 8), new Color(245, 247, 250), 18, true);
         DrawUiText(_status, new Vector2(12, 32), new Color(210, 220, 232), 16, false);
     }
 

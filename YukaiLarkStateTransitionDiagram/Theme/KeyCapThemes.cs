@@ -1,4 +1,4 @@
-namespace SkylarkStateTransitionDiagram.Theme;
+namespace YukaiLarkStateTransitionDiagram.Theme;
 
 using System.Collections.Generic;
 
