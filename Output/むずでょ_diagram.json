@@ -1,0 +1,184 @@
+{
+  "Nodes": [
+    {
+      "Id": 1,
+      "Label": "\u7121\u53CD\u5FDC",
+      "Position": {
+        "X": 300,
+        "Y": 220
+      },
+      "RadiusUnits": 3,
+      "ColorIndex": 0,
+      "Kind": 0
+    },
+    {
+      "Id": 2,
+      "Label": "\u58C1\u76F4\u524D",
+      "Position": {
+        "X": 580,
+        "Y": 220
+      },
+      "RadiusUnits": 3,
+      "ColorIndex": 1,
+      "Kind": 0
+    },
+    {
+      "Id": 3,
+      "Label": "\u58C1\u6B63\u9762",
+      "Position": {
+        "X": 580,
+        "Y": 500
+      },
+      "RadiusUnits": 3,
+      "ColorIndex": 2,
+      "Kind": 0
+    },
+    {
+      "Id": 4,
+      "Label": "\u58C1\u6CBF\u3044",
+      "Position": {
+        "X": 300,
+        "Y": 500
+      },
+      "RadiusUnits": 3,
+      "ColorIndex": 3,
+      "Kind": 0
+    },
+    {
+      "Id": 5,
+      "Label": "\u958B\u59CB",
+      "Position": {
+        "X": 160,
+        "Y": 120
+      },
+      "RadiusUnits": 2,
+      "ColorIndex": 0,
+      "Kind": 1
+    },
+    {
+      "Id": 6,
+      "Label": "\u7D42\u4E86",
+      "Position": {
+        "X": 160,
+        "Y": 600
+      },
+      "RadiusUnits": 2,
+      "ColorIndex": 5,
+      "Kind": 2
+    }
+  ],
+  "Transitions": [
+    {
+      "SourceId": 1,
+      "TargetId": 2,
+      "Label": "\u30EC\u30D0\u30FC\u62BC\u4E0B",
+      "LabelSide": 0,
+      "SourceAngle": -0.6128202,
+      "TargetAngle": -2.2987864,
+      "ControlPoint1": {
+        "X": 358,
+        "Y": 112
+      },
+      "ControlPoint2": {
+        "X": 513,
+        "Y": 105
+      }
+    },
+    {
+      "SourceId": 2,
+      "TargetId": 3,
+      "Label": "",
+      "LabelSide": 0,
+      "SourceAngle": 0.9304399,
+      "TargetAngle": -1.0327522,
+      "ControlPoint1": {
+        "X": 655,
+        "Y": 302
+      },
+      "ControlPoint2": {
+        "X": 657,
+        "Y": 396
+      }
+    },
+    {
+      "SourceId": 3,
+      "TargetId": 2,
+      "Label": "",
+      "LabelSide": 0,
+      "SourceAngle": -2.2554135,
+      "TargetAngle": 2.1861358,
+      "ControlPoint1": {
+        "X": 463,
+        "Y": 382
+      },
+      "ControlPoint2": {
+        "X": 460,
+        "Y": 323
+      }
+    },
+    {
+      "SourceId": 3,
+      "TargetId": 4,
+      "Label": "\u30EC\u30D0\u30FC\u62BC\u4E0B",
+      "LabelSide": 0,
+      "SourceAngle": 2.872425,
+      "TargetAngle": 0.86217004,
+      "ControlPoint1": {
+        "X": 499,
+        "Y": 584
+      },
+      "ControlPoint2": {
+        "X": 399,
+        "Y": 593
+      }
+    },
+    {
+      "SourceId": 3,
+      "TargetId": 3,
+      "Label": "\u518D\u5165",
+      "LabelSide": 0,
+      "SourceAngle": 0.15037143,
+      "TargetAngle": 0.5569015,
+      "ControlPoint1": {
+        "X": 787,
+        "Y": 575
+      },
+      "ControlPoint2": {
+        "X": 725,
+        "Y": 642
+      }
+    },
+    {
+      "SourceId": 5,
+      "TargetId": 1,
+      "Label": "",
+      "LabelSide": 0,
+      "SourceAngle": 0.44117948,
+      "TargetAngle": -2.536048,
+      "ControlPoint1": {
+        "X": 199,
+        "Y": 167
+      },
+      "ControlPoint2": {
+        "X": 226,
+        "Y": 183
+      }
+    },
+    {
+      "SourceId": 4,
+      "TargetId": 6,
+      "Label": "",
+      "LabelSide": 0,
+      "SourceAngle": 2.0112522,
+      "TargetAngle": -0.1746722,
+      "ControlPoint1": {
+        "X": 282,
+        "Y": 590
+      },
+      "ControlPoint2": {
+        "X": 240,
+        "Y": 614
+      }
+    }
+  ]
+}

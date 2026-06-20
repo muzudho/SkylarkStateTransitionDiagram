@@ -18,6 +18,8 @@ using DrawingRectangleF = System.Drawing.RectangleF;
 using DrawingSizeF = System.Drawing.SizeF;
 using DrawingStringFormat = System.Drawing.StringFormat;
 using DrawingStringFormatFlags = System.Drawing.StringFormatFlags;
+using OpenFileDialog = Microsoft.Win32.OpenFileDialog;
+using SaveFileDialog = Microsoft.Win32.SaveFileDialog;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
@@ -47,6 +49,7 @@ public class Game1 : Game
     private DiagramTransition? _draggedHandleTransition;
     private TransitionHandleKind _draggedHandleKind;
     private DiagramNode? _resizedNode;
+    private string? _currentFilePath;
     private Vector2 _dragOffset;
     private Vector2 _cameraOffset;
     private Vector2 _panStartMouse;
@@ -54,7 +57,7 @@ public class Game1 : Game
     private bool _isPanning;
     private int _nextNodeId = 1;
     private string _editingLabel = string.Empty;
-    private string _status = "N: add  T: node kind  C: color  F2/ENTER: edit label  drag resize handle: size  drag empty area: pan  CTRL+S/O: save/load";
+    private string _status = "N: add  CTRL+N: new  T: node kind  C: color  F2/ENTER: edit label  drag resize handle: size  drag empty area: pan  CTRL+S/O: save/load";
     public Game1()
     {
         _graphics = new GraphicsDeviceManager(this)
@@ -159,6 +162,28 @@ public class Game1 : Game
     }
     private void HandleKeyboard(KeyboardState keyboard, MouseState mouse)
     {
+        if (IsControlDown(keyboard) && IsNewKeyPress(keyboard, Keys.N))
+        {
+            CreateNewDiagram();
+            return;
+        }
+        if (IsControlDown(keyboard) && IsNewKeyPress(keyboard, Keys.S))
+        {
+            if (IsShiftDown(keyboard))
+            {
+                SaveDiagramAs();
+            }
+            else
+            {
+                SaveDiagram();
+            }
+            return;
+        }
+        if (IsControlDown(keyboard) && IsNewKeyPress(keyboard, Keys.O))
+        {
+            LoadDiagramFromDialog();
+            return;
+        }
         if (IsNewKeyPress(keyboard, Keys.F2) || IsNewKeyPress(keyboard, Keys.Enter))
         {
             if (_selectedNode is not null)
@@ -205,14 +230,6 @@ public class Game1 : Game
             {
                 _status = "Start and end states use fixed black. Press T to return to normal.";
             }
-        }
-        if (IsControlDown(keyboard) && IsNewKeyPress(keyboard, Keys.S))
-        {
-            SaveDiagram();
-        }
-        if (IsControlDown(keyboard) && IsNewKeyPress(keyboard, Keys.O))
-        {
-            LoadDiagram();
         }
     }
     private void HandleLabelEditingKeyboard(KeyboardState keyboard)
@@ -469,18 +486,69 @@ public class Game1 : Game
     }
     private void SaveDiagram()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, SaveFileName);
+        if (_currentFilePath is null)
+        {
+            SaveDiagramAs();
+            return;
+        }
+        SaveDiagramToPath(_currentFilePath);
+    }
+    private void SaveDiagramAs()
+    {
+        var dialog = new SaveFileDialog
+        {
+            AddExtension = true,
+            DefaultExt = "json",
+            FileName = _currentFilePath is null ? CreateDefaultDiagramFileName() : Path.GetFileName(_currentFilePath),
+            Filter = "JSON files (*.json)|*.json|All files (*.*)|*.*",
+            InitialDirectory = GetInitialDirectory(),
+            OverwritePrompt = true,
+            Title = "保存先を指定"
+        };
+        if (dialog.ShowDialog() != true)
+        {
+            _status = "Save canceled.";
+            return;
+        }
+        SaveDiagramToPath(dialog.FileName);
+    }
+    private void SaveDiagramToPath(string path)
+    {
         var document = new DiagramDocument { Nodes = _nodes, Transitions = _transitions };
         var json = JsonSerializer.Serialize(document, DiagramJsonOptions);
         File.WriteAllText(path, json, Utf8NoBom);
-        _status = $"Saved {SaveFileName} as UTF-8 without BOM.";
+        _currentFilePath = path;
+        _status = $"Saved {Path.GetFileName(path)} as UTF-8 without BOM.";
     }
     private void LoadDiagram()
     {
         var path = Path.Combine(AppContext.BaseDirectory, SaveFileName);
+        LoadDiagramFromPath(path);
+    }
+    private void LoadDiagramFromDialog()
+    {
+        var dialog = new OpenFileDialog
+        {
+            AddExtension = true,
+            DefaultExt = "json",
+            FileName = _currentFilePath is null ? string.Empty : Path.GetFileName(_currentFilePath),
+            Filter = "JSON files (*.json)|*.json|All files (*.*)|*.*",
+            InitialDirectory = GetInitialDirectory(),
+            Multiselect = false,
+            Title = "状態遷移図を読み込む"
+        };
+        if (dialog.ShowDialog() != true)
+        {
+            _status = "Load canceled.";
+            return;
+        }
+        LoadDiagramFromPath(dialog.FileName);
+    }
+    private void LoadDiagramFromPath(string path)
+    {
         if (!File.Exists(path))
         {
-            _status = $"No {SaveFileName} found next to the executable.";
+            _status = $"No {Path.GetFileName(path)} found.";
             return;
         }
         var document = JsonSerializer.Deserialize<DiagramDocument>(File.ReadAllText(path, Encoding.UTF8), DiagramJsonOptions);
@@ -500,7 +568,8 @@ public class Game1 : Game
         _nextNodeId = _nodes.Count == 0 ? 1 : _nodes.Max(n => n.Id) + 1;
         _selectedNode = null;
         _selectedTransition = null;
-        _status = $"Loaded {SaveFileName}.";
+        _currentFilePath = path;
+        _status = $"Loaded {Path.GetFileName(path)}.";
     }
     private void LoadOrCreateSample()
     {
@@ -509,7 +578,7 @@ public class Game1 : Game
         {
             try
             {
-                LoadDiagram();
+                LoadDiagramFromPath(path);
                 return;
             }
             catch
@@ -519,6 +588,12 @@ public class Game1 : Game
             }
         }
         CreateSample();
+    }
+    private void CreateNewDiagram()
+    {
+        CreateSample();
+        _currentFilePath = null;
+        SaveDiagramAs();
     }
     private void CreateSample()
     {
@@ -569,7 +644,7 @@ public class Game1 : Game
         _selectedNode = null;
         _selectedTransition = null;
         _cameraOffset = Vector2.Zero;
-        _status = "N: add  T: node kind  C: color  F2/ENTER: edit label  drag resize handle: size  drag empty area: pan  CTRL+S/O: save/load";
+        _status = "N: add  CTRL+N: new  T: node kind  C: color  F2/ENTER: edit label  drag resize handle: size  drag empty area: pan  CTRL+S/O: save/load";
     }
     private DiagramNode? FindNodeAt(Vector2 position)
     {
@@ -1069,8 +1144,24 @@ public class Game1 : Game
         => keyboard.IsKeyDown(key) && !_previousKeyboard.IsKeyDown(key);
     private static bool IsControlDown(KeyboardState keyboard)
         => keyboard.IsKeyDown(Keys.LeftControl) || keyboard.IsKeyDown(Keys.RightControl);
+    private static bool IsShiftDown(KeyboardState keyboard)
+        => keyboard.IsKeyDown(Keys.LeftShift) || keyboard.IsKeyDown(Keys.RightShift);
     private static bool IsAltDown(KeyboardState keyboard)
         => keyboard.IsKeyDown(Keys.LeftAlt) || keyboard.IsKeyDown(Keys.RightAlt);
+    private string GetInitialDirectory()
+    {
+        if (_currentFilePath is not null)
+        {
+            var currentDirectory = Path.GetDirectoryName(_currentFilePath);
+            if (!string.IsNullOrWhiteSpace(currentDirectory) && Directory.Exists(currentDirectory))
+            {
+                return currentDirectory;
+            }
+        }
+        return Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+    }
+    private static string CreateDefaultDiagramFileName()
+        => $"{DateTime.Now:yyyyMMddHHmmss}_dialog.json";
     private static float DistanceToBezier(Vector2 point, Vector2 start, Vector2 control1, Vector2 control2, Vector2 end)
     {
         const int segments = 32;
