@@ -133,7 +133,7 @@ public class Game1 : Game
         if (_isExportSelecting)
         {
             HandleExportSelectionKeyboard(keyboard);
-            HandleExportSelectionMouse(mouse);
+            HandleExportSelectionMouse(keyboard, mouse);
         }
         else if (IsEditingLabel)
         {
@@ -328,11 +328,12 @@ public class Game1 : Game
         }
     }
 
-    private void HandleExportSelectionMouse(MouseState mouse)
+    private void HandleExportSelectionMouse(KeyboardState keyboard, MouseState mouse)
     {
         var screenPosition = mouse.Position.ToVector2();
         var leftPressed = mouse.LeftButton == ButtonState.Pressed && _previousMouse.LeftButton == ButtonState.Released;
         var leftReleased = mouse.LeftButton == ButtonState.Released && _previousMouse.LeftButton == ButtonState.Pressed;
+        var snapSelection = !IsAltDown(keyboard);
 
         if (leftPressed)
         {
@@ -351,23 +352,23 @@ public class Game1 : Game
             if (_exportDragMode == ExportSelectionDragMode.New)
             {
                 _exportSelectionRectangle = new Rectangle((int)screenPosition.X, (int)screenPosition.Y, 0, 0);
-                _status = "PNG範囲を作成中です。離した後に四辺をドラッグで調整、Enterで撮影。";
+                _status = "PNG範囲を作成中です。半グリッドに吸着、Alt中は吸着なし。";
             }
             else
             {
-                _status = "PNG範囲を調整中です。四辺・角・内側ドラッグで調整、Enterで撮影。";
+                _status = "PNG範囲を調整中です。半グリッドに吸着、Alt中は吸着なし。";
             }
             return;
         }
 
         if (_exportSelectionDragging && mouse.LeftButton == ButtonState.Pressed)
         {
-            UpdateExportSelectionDrag(screenPosition);
+            UpdateExportSelectionDrag(screenPosition, snapSelection);
         }
 
         if (leftReleased && _exportSelectionDragging)
         {
-            UpdateExportSelectionDrag(screenPosition);
+            UpdateExportSelectionDrag(screenPosition, snapSelection);
             _exportSelectionDragging = false;
             _exportDragMode = ExportSelectionDragMode.None;
             if (_exportSelectionRectangle.Width < 16 || _exportSelectionRectangle.Height < 16)
@@ -378,7 +379,9 @@ public class Game1 : Game
             }
 
             _hasExportSelection = true;
-            _status = "PNG範囲を調整できます。四辺・角・内側をドラッグ、Enterで撮影、Escでキャンセル。";
+            _status = snapSelection
+                ? "PNG範囲を半グリッドに吸着して調整しました。Altで吸着なし、Enterで撮影。"
+                : "PNG範囲を自由位置で調整しました。Altを離すと半グリッド吸着、Enterで撮影。";
         }
     }
 
@@ -396,7 +399,7 @@ public class Game1 : Game
         _draggedHandleKind = TransitionHandleKind.None;
         _linkSource = null;
         _isPanning = false;
-        _status = "PNG出力モードです。左ドラッグで範囲作成、四辺を調整、Enterで撮影。Escでキャンセル。";
+        _status = "PNG出力モードです。左ドラッグで範囲作成、半グリッド吸着、Altで吸着なし、Enterで撮影。";
     }
 
     private void CancelPngExportSelection(string status)
@@ -411,16 +414,16 @@ public class Game1 : Game
     private Rectangle GetExportSelectionRectangle()
         => _exportSelectionRectangle;
 
-    private void UpdateExportSelectionDrag(Vector2 screenPosition)
+    private void UpdateExportSelectionDrag(Vector2 screenPosition, bool snapSelection)
     {
         var rectangle = _exportDragMode == ExportSelectionDragMode.New
-            ? RectangleFromPoints(_exportDragStart, screenPosition)
-            : ResizeExportSelection(_exportDragStartRectangle, _exportDragMode, screenPosition - _exportDragStart);
+            ? RectangleFromPoints(snapSelection ? SnapScreenToHalfGrid(_exportDragStart) : _exportDragStart, snapSelection ? SnapScreenToHalfGrid(screenPosition) : screenPosition)
+            : ResizeExportSelection(_exportDragStartRectangle, _exportDragMode, screenPosition - _exportDragStart, snapSelection);
         _exportSelectionRectangle = ClampExportSelectionRectangle(rectangle);
         _hasExportSelection = _exportSelectionRectangle.Width >= 16 && _exportSelectionRectangle.Height >= 16;
     }
 
-    private Rectangle ResizeExportSelection(Rectangle rectangle, ExportSelectionDragMode mode, Vector2 delta)
+    private Rectangle ResizeExportSelection(Rectangle rectangle, ExportSelectionDragMode mode, Vector2 delta, bool snapSelection)
     {
         var left = rectangle.Left;
         var top = rectangle.Top;
@@ -431,7 +434,15 @@ public class Game1 : Game
 
         if (mode == ExportSelectionDragMode.Move)
         {
-            return ClampMovedExportSelection(new Rectangle(rectangle.X + dx, rectangle.Y + dy, rectangle.Width, rectangle.Height));
+            var x = rectangle.X + dx;
+            var y = rectangle.Y + dy;
+            if (snapSelection)
+            {
+                var snapped = SnapScreenToHalfGrid(new Vector2(x, y));
+                x = (int)MathF.Round(snapped.X);
+                y = (int)MathF.Round(snapped.Y);
+            }
+            return ClampMovedExportSelection(new Rectangle(x, y, rectangle.Width, rectangle.Height));
         }
 
         if (mode is ExportSelectionDragMode.Left or ExportSelectionDragMode.TopLeft or ExportSelectionDragMode.BottomLeft)
@@ -451,9 +462,37 @@ public class Game1 : Game
             bottom += dy;
         }
 
+        if (snapSelection)
+        {
+            if (mode is ExportSelectionDragMode.Left or ExportSelectionDragMode.TopLeft or ExportSelectionDragMode.BottomLeft)
+            {
+                left = SnapScreenX(left);
+            }
+            if (mode is ExportSelectionDragMode.Right or ExportSelectionDragMode.TopRight or ExportSelectionDragMode.BottomRight)
+            {
+                right = SnapScreenX(right);
+            }
+            if (mode is ExportSelectionDragMode.Top or ExportSelectionDragMode.TopLeft or ExportSelectionDragMode.TopRight)
+            {
+                top = SnapScreenY(top);
+            }
+            if (mode is ExportSelectionDragMode.Bottom or ExportSelectionDragMode.BottomLeft or ExportSelectionDragMode.BottomRight)
+            {
+                bottom = SnapScreenY(bottom);
+            }
+        }
+
         return RectangleFromEdges(left, top, right, bottom);
     }
 
+    private Vector2 SnapScreenToHalfGrid(Vector2 screenPosition)
+        => SnapToHalfGrid(ScreenToWorld(screenPosition)) + _cameraOffset;
+
+    private int SnapScreenX(int x)
+        => (int)MathF.Round(SnapScreenToHalfGrid(new Vector2(x, 0)).X);
+
+    private int SnapScreenY(int y)
+        => (int)MathF.Round(SnapScreenToHalfGrid(new Vector2(0, y)).Y);
     private Rectangle ClampMovedExportSelection(Rectangle rectangle)
     {
         var viewport = GraphicsDevice.Viewport;
