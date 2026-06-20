@@ -303,6 +303,7 @@ public class Game1 : Game
         var leftPressed = mouse.LeftButton == ButtonState.Pressed && _previousMouse.LeftButton == ButtonState.Released;
         var leftReleased = mouse.LeftButton == ButtonState.Released && _previousMouse.LeftButton == ButtonState.Pressed;
         var shiftDown = keyboard.IsKeyDown(Keys.LeftShift) || keyboard.IsKeyDown(Keys.RightShift);
+        var snapNodes = !IsAltDown(keyboard);
         if (leftPressed)
         {
             _isPanning = false;
@@ -368,7 +369,8 @@ public class Game1 : Game
         }
         if (_draggedNode is not null && mouse.LeftButton == ButtonState.Pressed)
         {
-            _draggedNode.Position = mousePosition - _dragOffset;
+            var position = mousePosition - _dragOffset;
+            _draggedNode.Position = snapNodes ? SnapToHalfGrid(position) : position;
         }
         if (_resizedNode is not null && mouse.LeftButton == ButtonState.Pressed)
         {
@@ -400,6 +402,12 @@ public class Game1 : Game
             {
                 _status = "Edge handle moved. CTRL+S saves it.";
             }
+            if (_draggedNode is not null)
+            {
+                _status = snapNodes
+                    ? "State moved. Center snapped to half-grid units. CTRL+S saves it."
+                    : "State moved without snapping. CTRL+S saves it.";
+            }
             if (_resizedNode is not null)
             {
                 _status = $"State radius set to {_resizedNode.RadiusUnits} half-grid unit(s). CTRL+S saves it.";
@@ -421,7 +429,7 @@ public class Game1 : Game
         {
             Id = _nextNodeId++,
             Label = $"状態{_nextNodeId - 1}",
-            Position = position,
+            Position = SnapToHalfGrid(position),
             RadiusUnits = DiagramNode.DefaultRadiusUnits,
             ColorIndex = (_nextNodeId - 2) % Palette.Length
         };
@@ -779,6 +787,13 @@ public class Game1 : Game
         => Matrix.CreateTranslation(_cameraOffset.X, _cameraOffset.Y, 0f);
     private Vector2 ScreenToWorld(Vector2 screenPosition)
         => screenPosition - _cameraOffset;
+    private static Vector2 SnapToHalfGrid(Vector2 position)
+    {
+        const float unit = DiagramNode.RadiusUnit;
+        return new Vector2(
+            MathF.Round(position.X / unit) * unit,
+            MathF.Round(position.Y / unit) * unit);
+    }
     private void DrawGrid(int spacing, Color color)
     {
         var topLeft = ScreenToWorld(Vector2.Zero);
@@ -1054,6 +1069,8 @@ public class Game1 : Game
         => keyboard.IsKeyDown(key) && !_previousKeyboard.IsKeyDown(key);
     private static bool IsControlDown(KeyboardState keyboard)
         => keyboard.IsKeyDown(Keys.LeftControl) || keyboard.IsKeyDown(Keys.RightControl);
+    private static bool IsAltDown(KeyboardState keyboard)
+        => keyboard.IsKeyDown(Keys.LeftAlt) || keyboard.IsKeyDown(Keys.RightAlt);
     private static float DistanceToBezier(Vector2 point, Vector2 start, Vector2 control1, Vector2 control2, Vector2 end)
     {
         const int segments = 32;
