@@ -65,6 +65,7 @@ public class Game1 : Game
     private readonly Dictionary<string, Texture2D> _labelTextureCache = new();
     private readonly Dictionary<string, Texture2D> _uiTextTextureCache = new();
     private IKeyCapTheme _keyCapTheme = KeyCapThemes.Current;
+    private BoardTheme _boardTheme = BoardThemes.ForKeyCapTheme(KeyCapThemes.Current);
     private SpriteBatch _spriteBatch = null!;
     private Texture2D _pixel = null!;
     private MouseState _previousMouse;
@@ -84,10 +85,14 @@ public class Game1 : Game
     private Vector2 _panStartMouse;
     private Vector2 _panStartCamera;
     private bool _isPanning;
+    private bool _isExportSelecting;
+    private bool _exportSelectionDragging;
+    private Vector2 _exportSelectionStart;
+    private Vector2 _exportSelectionEnd;
     private int _nextNodeId = 1;
     private string _editingLabel = string.Empty;
     private string _status = DefaultStatus;
-    private const string DefaultStatus = "N: 状態追加 / Shift+ドラッグ: 遷移作成 / F2・Enter: ラベル編集 / Ctrl+S: 保存";
+    private const string DefaultStatus = "N: 状態追加 / Shift+ドラッグ: 遷移作成 / F2・Enter: ラベル編集 / Ctrl+S: 保存 / Ctrl+P: PNG";
     public Game1()
     {
         _graphics = new GraphicsDeviceManager(this)
@@ -117,7 +122,12 @@ public class Game1 : Game
     {
         var keyboard = Keyboard.GetState();
         var mouse = Mouse.GetState();
-        if (IsEditingLabel)
+        if (_isExportSelecting)
+        {
+            HandleExportSelectionKeyboard(keyboard);
+            HandleExportSelectionMouse(mouse);
+        }
+        else if (IsEditingLabel)
         {
             HandleLabelEditingKeyboard(keyboard);
         }
@@ -136,37 +146,14 @@ public class Game1 : Game
     }
     protected override void Draw(GameTime gameTime)
     {
-        GraphicsDevice.Clear(new Color(28, 31, 36));
-        _spriteBatch.Begin(samplerState: SamplerState.PointClamp, transformMatrix: GetViewMatrix());
-        DrawGrid(40, new Color(42, 46, 52));
-        foreach (var transition in _transitions)
-        {
-            DrawTransition(transition, transition == _selectedTransition);
-        }
-        DrawHoverCue();
-        if (_linkSource is not null)
-        {
-            var mouse = Mouse.GetState();
-            DrawArrow(_linkSource.Position, ScreenToWorld(mouse.Position.ToVector2()), new Color(250, 205, 95), 3f);
-        }
-        foreach (var node in _nodes)
-        {
-            DrawNode(node, node == _selectedNode);
-        }
-        if (_selectedNode is not null)
-        {
-            DrawNodeResizeHandle(_selectedNode);
-        }
-        if (_selectedTransition is not null)
-        {
-            DrawTransitionHandles(_selectedTransition);
-        }
-        _spriteBatch.End();
+        GraphicsDevice.Clear(_boardTheme.BackgroundColor);
+        DrawDiagramScene(GetViewMatrix(), includeInteraction: true);
 
         _spriteBatch.Begin(samplerState: SamplerState.PointClamp);
         DrawToolbar();
         DrawInspectorPanel();
         DrawBottomHelp();
+        DrawExportSelectionOverlay();
         _spriteBatch.End();
         base.Draw(gameTime);
     }
@@ -220,6 +207,11 @@ public class Game1 : Game
         if (IsControlDown(keyboard) && IsNewKeyPress(keyboard, Keys.O))
         {
             LoadDiagramFromDialog();
+            return;
+        }
+        if (IsControlDown(keyboard) && IsNewKeyPress(keyboard, Keys.P))
+        {
+            BeginPngExportSelection();
             return;
         }
         if (TryGetThemeShortcutIndex(keyboard, out var themeIndex))
@@ -298,9 +290,148 @@ public class Game1 : Game
         }
 
         _keyCapTheme = KeyCapThemes.ShortcutThemes[themeIndex];
-        _status = $"キーキャップテーマを {themeIndex}: {_keyCapTheme.Name} に切り替えました。";
+        _boardTheme = BoardThemes.ForKeyCapTheme(_keyCapTheme);
+        _status = $"テーマを {themeIndex}: {_keyCapTheme.Name} に切り替えました。背景とPNG出力にも反映します。";
     }
 
+    private void HandleExportSelectionKeyboard(KeyboardState keyboard)
+    {
+        if (IsNewKeyPress(keyboard, Keys.Escape))
+        {
+            CancelPngExportSelection("PNG出力をキャンセルしました。");
+        }
+    }
+
+    private void HandleExportSelectionMouse(MouseState mouse)
+    {
+        var screenPosition = mouse.Position.ToVector2();
+        var leftPressed = mouse.LeftButton == ButtonState.Pressed && _previousMouse.LeftButton == ButtonState.Released;
+        var leftReleased = mouse.LeftButton == ButtonState.Released && _previousMouse.LeftButton == ButtonState.Pressed;
+
+        if (leftPressed)
+        {
+            _exportSelectionDragging = true;
+            _exportSelectionStart = screenPosition;
+            _exportSelectionEnd = screenPosition;
+            _status = "PNGにしたい範囲をドラッグしてください。Escでキャンセルできます。";
+            return;
+        }
+
+        if (_exportSelectionDragging && mouse.LeftButton == ButtonState.Pressed)
+        {
+            _exportSelectionEnd = screenPosition;
+        }
+
+        if (leftReleased && _exportSelectionDragging)
+        {
+            _exportSelectionEnd = screenPosition;
+            var selection = GetExportSelectionRectangle();
+            _exportSelectionDragging = false;
+            _isExportSelecting = false;
+            if (selection.Width < 16 || selection.Height < 16)
+            {
+                _status = "PNG出力範囲が小さすぎます。Ctrl+Pでもう一度指定してください。";
+                return;
+            }
+
+            SavePngSelection(selection);
+        }
+    }
+
+    private void BeginPngExportSelection()
+    {
+        _isExportSelecting = true;
+        _exportSelectionDragging = false;
+        _draggedNode = null;
+        _resizedNode = null;
+        _draggedHandleTransition = null;
+        _draggedHandleKind = TransitionHandleKind.None;
+        _linkSource = null;
+        _isPanning = false;
+        _status = "PNG出力モードです。書き出す範囲を左ドラッグしてください。Escでキャンセル。";
+    }
+
+    private void CancelPngExportSelection(string status)
+    {
+        _isExportSelecting = false;
+        _exportSelectionDragging = false;
+        _status = status;
+    }
+
+    private Rectangle GetExportSelectionRectangle()
+    {
+        var left = (int)MathF.Min(_exportSelectionStart.X, _exportSelectionEnd.X);
+        var top = (int)MathF.Min(_exportSelectionStart.Y, _exportSelectionEnd.Y);
+        var right = (int)MathF.Max(_exportSelectionStart.X, _exportSelectionEnd.X);
+        var bottom = (int)MathF.Max(_exportSelectionStart.Y, _exportSelectionEnd.Y);
+        var viewport = GraphicsDevice.Viewport;
+        left = Math.Clamp(left, 0, viewport.Width);
+        right = Math.Clamp(right, 0, viewport.Width);
+        top = Math.Clamp(top, 0, viewport.Height);
+        bottom = Math.Clamp(bottom, 0, viewport.Height);
+        return new Rectangle(left, top, Math.Max(0, right - left), Math.Max(0, bottom - top));
+    }
+
+    private void SavePngSelection(Rectangle selection)
+    {
+        var dialog = new SaveFileDialog
+        {
+            AddExtension = true,
+            DefaultExt = "png",
+            FileName = CreateDefaultPngFileName(),
+            Filter = "PNG files (*.png)|*.png|All files (*.*)|*.*",
+            InitialDirectory = GetInitialDirectory(),
+            OverwritePrompt = true,
+            Title = "PNG画像の保存先を指定"
+        };
+        if (dialog.ShowDialog() != true)
+        {
+            _status = "PNG出力をキャンセルしました。";
+            return;
+        }
+
+        ExportSelectionToPng(selection, dialog.FileName);
+        _status = $"{Path.GetFileName(dialog.FileName)} をPNG出力しました。";
+    }
+
+    private void ExportSelectionToPng(Rectangle selection, string path)
+    {
+        const int photoMargin = 34;
+        var imageWidth = selection.Width + photoMargin * 2;
+        var imageHeight = selection.Height + photoMargin * 2;
+        var previousTargets = GraphicsDevice.GetRenderTargets();
+        using var renderTarget = new RenderTarget2D(GraphicsDevice, imageWidth, imageHeight, false, SurfaceFormat.Color, DepthFormat.None);
+
+        GraphicsDevice.SetRenderTarget(renderTarget);
+        GraphicsDevice.Clear(_boardTheme.ExportBackdropColor);
+
+        _spriteBatch.Begin(samplerState: SamplerState.PointClamp);
+        DrawExportPhotoFrame(imageWidth, imageHeight, photoMargin);
+        _spriteBatch.End();
+
+        var worldTopLeft = ScreenToWorld(new Vector2(selection.X, selection.Y));
+        var worldBottomRight = ScreenToWorld(new Vector2(selection.Right, selection.Bottom));
+        var exportTransform = Matrix.CreateTranslation(-worldTopLeft.X + photoMargin, -worldTopLeft.Y + photoMargin, 0f);
+        var previousScissor = GraphicsDevice.ScissorRectangle;
+        using var scissorRasterizer = new RasterizerState { ScissorTestEnable = true };
+        GraphicsDevice.ScissorRectangle = new Rectangle(photoMargin, photoMargin, selection.Width, selection.Height);
+        _spriteBatch.Begin(samplerState: SamplerState.PointClamp, rasterizerState: scissorRasterizer, transformMatrix: exportTransform);
+        DrawGrid(40, _boardTheme.GridColor, worldTopLeft, worldBottomRight);
+        DrawDiagramContent(includeInteraction: false);
+        _spriteBatch.End();
+        GraphicsDevice.ScissorRectangle = previousScissor;
+
+        _spriteBatch.Begin(samplerState: SamplerState.PointClamp);
+        DrawExportPhotoTop(imageWidth, imageHeight, photoMargin);
+        _spriteBatch.End();
+
+        GraphicsDevice.SetRenderTargets(previousTargets);
+        using var stream = File.Create(path);
+        renderTarget.SaveAsPng(stream, imageWidth, imageHeight);
+    }
+
+    private static string CreateDefaultPngFileName()
+        => $"{DateTime.Now:yyyyMMddHHmmss}_diagram.png";
     private void HandleLabelEditingKeyboard(KeyboardState keyboard)
     {
         if (IsNewKeyPress(keyboard, Keys.Enter))
@@ -943,6 +1074,11 @@ public class Game1 : Game
     {
         var topLeft = ScreenToWorld(Vector2.Zero);
         var bottomRight = ScreenToWorld(new Vector2(GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height));
+        DrawGrid(spacing, color, topLeft, bottomRight);
+    }
+
+    private void DrawGrid(int spacing, Color color, Vector2 topLeft, Vector2 bottomRight)
+    {
         var startX = (int)MathF.Floor(topLeft.X / spacing) * spacing;
         var endX = (int)MathF.Ceiling(bottomRight.X / spacing) * spacing;
         var startY = (int)MathF.Floor(topLeft.Y / spacing) * spacing;
@@ -1000,6 +1136,102 @@ public class Game1 : Game
         }
     }
 
+    private void DrawDiagramScene(Matrix transformMatrix, bool includeInteraction)
+    {
+        _spriteBatch.Begin(samplerState: SamplerState.PointClamp, transformMatrix: transformMatrix);
+        DrawGrid(40, _boardTheme.GridColor);
+        DrawDiagramContent(includeInteraction);
+        _spriteBatch.End();
+    }
+
+    private void DrawDiagramContent(bool includeInteraction)
+    {
+        foreach (var transition in _transitions)
+        {
+            DrawTransition(transition, includeInteraction && transition == _selectedTransition);
+        }
+        if (includeInteraction)
+        {
+            DrawHoverCue();
+            if (_linkSource is not null)
+            {
+                var mouse = Mouse.GetState();
+                DrawArrow(_linkSource.Position, ScreenToWorld(mouse.Position.ToVector2()), new Color(250, 205, 95), 3f);
+            }
+        }
+        foreach (var node in _nodes)
+        {
+            DrawNode(node, includeInteraction && node == _selectedNode);
+        }
+        if (includeInteraction && _selectedNode is not null)
+        {
+            DrawNodeResizeHandle(_selectedNode);
+        }
+        if (includeInteraction && _selectedTransition is not null)
+        {
+            DrawTransitionHandles(_selectedTransition);
+        }
+    }
+
+    private void DrawExportSelectionOverlay()
+    {
+        if (!_isExportSelecting)
+        {
+            return;
+        }
+
+        _spriteBatch.Draw(_pixel, new Rectangle(0, 0, GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height), new Color(0, 0, 0, 94));
+        if (!_exportSelectionDragging)
+        {
+            return;
+        }
+
+        var rectangle = GetExportSelectionRectangle();
+        if (rectangle.Width <= 0 || rectangle.Height <= 0)
+        {
+            return;
+        }
+
+        _spriteBatch.Draw(_pixel, rectangle, new Color(255, 246, 210, 52));
+        DrawScreenRectangleOutline(rectangle, new Color(255, 236, 150), 2);
+    }
+
+    private void DrawExportPhotoFrame(int width, int height, int margin)
+    {
+        _spriteBatch.Draw(_pixel, new Rectangle(0, 0, width, height), _boardTheme.ExportBackdropColor);
+        var shadow = new Rectangle(margin - 12, margin - 10, width - margin * 2 + 24, height - margin * 2 + 24);
+        _spriteBatch.Draw(_pixel, shadow, new Color(20, 14, 10, 88));
+        var paper = new Rectangle(margin - 16, margin - 18, width - margin * 2 + 32, height - margin * 2 + 42);
+        _spriteBatch.Draw(_pixel, paper, _boardTheme.PhotoPaperColor);
+        var imageArea = new Rectangle(margin, margin, width - margin * 2, height - margin * 2);
+        _spriteBatch.Draw(_pixel, imageArea, _boardTheme.BackgroundColor);
+    }
+
+    private void DrawExportPhotoTop(int width, int height, int margin)
+    {
+        var paper = new Rectangle(margin - 16, margin - 18, width - margin * 2 + 32, height - margin * 2 + 42);
+        DrawScreenRectangleOutline(paper, _boardTheme.PhotoEdgeColor, 2);
+        var imageArea = new Rectangle(margin, margin, width - margin * 2, height - margin * 2);
+        DrawScreenRectangleOutline(imageArea, new Color(130, 120, 108, 120), 1);
+        DrawPin(new Vector2(paper.X + 26, paper.Y + 20), _boardTheme.PinColor);
+        DrawPin(new Vector2(paper.Right - 26, paper.Y + 20), _boardTheme.PinColor);
+    }
+
+    private void DrawPin(Vector2 center, Color color)
+    {
+        DrawCircle(center + new Vector2(2, 3), 10f, new Color(20, 14, 12, 95));
+        DrawCircle(center, 9f, color);
+        DrawCircleOutline(center, 9f, new Color(80, 42, 36, 170), 2f);
+        DrawCircle(center - new Vector2(3, 3), 3f, new Color(255, 244, 220, 185));
+    }
+
+    private void DrawScreenRectangleOutline(Rectangle rectangle, Color color, int thickness)
+    {
+        _spriteBatch.Draw(_pixel, new Rectangle(rectangle.X, rectangle.Y, rectangle.Width, thickness), color);
+        _spriteBatch.Draw(_pixel, new Rectangle(rectangle.X, rectangle.Bottom - thickness, rectangle.Width, thickness), color);
+        _spriteBatch.Draw(_pixel, new Rectangle(rectangle.X, rectangle.Y, thickness, rectangle.Height), color);
+        _spriteBatch.Draw(_pixel, new Rectangle(rectangle.Right - thickness, rectangle.Y, thickness, rectangle.Height), color);
+    }
     private void DrawToolbar()
     {
         var width = GraphicsDevice.Viewport.Width;
@@ -1522,6 +1754,31 @@ public enum TransitionHandleKind
     TargetEndpoint,
     ControlPoint1,
     ControlPoint2
+}
+public sealed record BoardTheme(
+    Color BackgroundColor,
+    Color GridColor,
+    Color ExportBackdropColor,
+    Color PhotoPaperColor,
+    Color PhotoEdgeColor,
+    Color PinColor);
+
+public static class BoardThemes
+{
+    public static BoardTheme ForKeyCapTheme(IKeyCapTheme keyCapTheme)
+        => keyCapTheme.Name switch
+        {
+            "Gaming" => new BoardTheme(new Color(18, 20, 28), new Color(42, 88, 96), new Color(15, 18, 24), new Color(230, 236, 232), new Color(78, 104, 108), new Color(88, 232, 206)),
+            "Retro" => new BoardTheme(new Color(116, 82, 52), new Color(149, 109, 70), new Color(98, 65, 40), new Color(241, 229, 198), new Color(155, 125, 82), new Color(190, 54, 44)),
+            "CopyPaper" => new BoardTheme(new Color(226, 229, 224), new Color(198, 205, 202), new Color(190, 185, 174), new Color(252, 250, 242), new Color(190, 184, 172), new Color(60, 112, 178)),
+            "Girly" => new BoardTheme(new Color(67, 47, 62), new Color(119, 78, 104), new Color(92, 62, 78), new Color(255, 236, 240), new Color(205, 142, 162), new Color(232, 92, 132)),
+            "Edo" => new BoardTheme(new Color(36, 45, 50), new Color(70, 86, 82), new Color(41, 35, 30), new Color(238, 231, 207), new Color(123, 88, 54), new Color(178, 48, 44)),
+            "Monochrome" => new BoardTheme(new Color(34, 34, 34), new Color(68, 68, 68), new Color(24, 24, 24), new Color(235, 235, 228), new Color(120, 120, 114), new Color(210, 210, 210)),
+            "Mint" => new BoardTheme(new Color(29, 61, 57), new Color(63, 104, 96), new Color(46, 82, 74), new Color(235, 250, 239), new Color(126, 170, 152), new Color(76, 198, 157)),
+            "Amber" => new BoardTheme(new Color(66, 49, 34), new Color(112, 83, 48), new Color(86, 61, 35), new Color(248, 229, 188), new Color(176, 126, 56), new Color(225, 151, 48)),
+            "Midnight" => new BoardTheme(new Color(17, 24, 34), new Color(37, 52, 68), new Color(14, 19, 28), new Color(230, 234, 232), new Color(90, 102, 116), new Color(96, 154, 232)),
+            _ => new BoardTheme(new Color(28, 31, 36), new Color(42, 46, 52), new Color(104, 73, 48), new Color(244, 236, 218), new Color(150, 132, 106), new Color(190, 54, 44))
+        };
 }
 public static class PrimitiveText
 {
