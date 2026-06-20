@@ -27,6 +27,11 @@ using Microsoft.Xna.Framework.Input;
 public class Game1 : Game
 {
     private const string SaveFileName = "diagram.json";
+    private const int ExportPhotoImageMargin = 34;
+    private const int ExportPhotoPaperSidePadding = 16;
+    private const int ExportPhotoPaperTopPadding = 18;
+    private const int ExportPhotoPaperBottomPadding = 54;
+    private const int ExportPhotoOuterBottomPadding = 10;
     private static readonly Keys[] ThemeDigitKeys =
     [
         Keys.D0,
@@ -396,9 +401,9 @@ public class Game1 : Game
 
     private void ExportSelectionToPng(Rectangle selection, string path)
     {
-        const int photoMargin = 34;
-        var imageWidth = selection.Width + photoMargin * 2;
-        var imageHeight = selection.Height + photoMargin * 2;
+        var imageWidth = selection.Width + ExportPhotoImageMargin * 2;
+        var imageHeight = selection.Height + ExportPhotoImageMargin + ExportPhotoPaperBottomPadding + ExportPhotoOuterBottomPadding;
+        var imageArea = new Rectangle(ExportPhotoImageMargin, ExportPhotoImageMargin, selection.Width, selection.Height);
         var previousTargets = GraphicsDevice.GetRenderTargets();
         using var renderTarget = new RenderTarget2D(GraphicsDevice, imageWidth, imageHeight, false, SurfaceFormat.Color, DepthFormat.None);
 
@@ -406,15 +411,15 @@ public class Game1 : Game
         GraphicsDevice.Clear(_boardTheme.ExportBackdropColor);
 
         _spriteBatch.Begin(samplerState: SamplerState.PointClamp);
-        DrawExportPhotoFrame(imageWidth, imageHeight, photoMargin);
+        DrawExportPhotoFrame(new Rectangle(0, 0, imageWidth, imageHeight), imageArea, fillBackdrop: true, fillImageArea: true);
         _spriteBatch.End();
 
         var worldTopLeft = ScreenToWorld(new Vector2(selection.X, selection.Y));
         var worldBottomRight = ScreenToWorld(new Vector2(selection.Right, selection.Bottom));
-        var exportTransform = Matrix.CreateTranslation(-worldTopLeft.X + photoMargin, -worldTopLeft.Y + photoMargin, 0f);
+        var exportTransform = Matrix.CreateTranslation(-worldTopLeft.X + imageArea.X, -worldTopLeft.Y + imageArea.Y, 0f);
         var previousScissor = GraphicsDevice.ScissorRectangle;
         using var scissorRasterizer = new RasterizerState { ScissorTestEnable = true };
-        GraphicsDevice.ScissorRectangle = new Rectangle(photoMargin, photoMargin, selection.Width, selection.Height);
+        GraphicsDevice.ScissorRectangle = imageArea;
         _spriteBatch.Begin(samplerState: SamplerState.PointClamp, rasterizerState: scissorRasterizer, transformMatrix: exportTransform);
         DrawGrid(40, _boardTheme.GridColor, worldTopLeft, worldBottomRight);
         DrawDiagramContent(includeInteraction: false);
@@ -422,7 +427,7 @@ public class Game1 : Game
         GraphicsDevice.ScissorRectangle = previousScissor;
 
         _spriteBatch.Begin(samplerState: SamplerState.PointClamp);
-        DrawExportPhotoTop(imageWidth, imageHeight, photoMargin);
+        DrawExportPhotoTop(imageArea);
         _spriteBatch.End();
 
         GraphicsDevice.SetRenderTargets(previousTargets);
@@ -1192,29 +1197,70 @@ public class Game1 : Game
             return;
         }
 
-        _spriteBatch.Draw(_pixel, rectangle, new Color(255, 246, 210, 52));
+        DrawExportPhotoFrame(new Rectangle(0, 0, GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height), rectangle, fillBackdrop: false, fillImageArea: false);
+        _spriteBatch.Draw(_pixel, rectangle, new Color(255, 246, 210, 38));
+        DrawExportPhotoTop(rectangle);
         DrawScreenRectangleOutline(rectangle, new Color(255, 236, 150), 2);
     }
 
-    private void DrawExportPhotoFrame(int width, int height, int margin)
+    private void DrawExportPhotoFrame(Rectangle canvas, Rectangle imageArea, bool fillBackdrop, bool fillImageArea)
     {
-        _spriteBatch.Draw(_pixel, new Rectangle(0, 0, width, height), _boardTheme.ExportBackdropColor);
-        var shadow = new Rectangle(margin - 12, margin - 10, width - margin * 2 + 24, height - margin * 2 + 24);
+        if (fillBackdrop)
+        {
+            _spriteBatch.Draw(_pixel, canvas, _boardTheme.ExportBackdropColor);
+        }
+
+        var shadow = GetExportPhotoShadowRectangle(imageArea);
         _spriteBatch.Draw(_pixel, shadow, new Color(20, 14, 10, 88));
-        var paper = new Rectangle(margin - 16, margin - 18, width - margin * 2 + 32, height - margin * 2 + 42);
-        _spriteBatch.Draw(_pixel, paper, _boardTheme.PhotoPaperColor);
-        var imageArea = new Rectangle(margin, margin, width - margin * 2, height - margin * 2);
-        _spriteBatch.Draw(_pixel, imageArea, _boardTheme.BackgroundColor);
+        DrawExportPhotoPaper(imageArea, fillImageArea);
+        if (fillImageArea)
+        {
+            _spriteBatch.Draw(_pixel, imageArea, _boardTheme.BackgroundColor);
+        }
     }
 
-    private void DrawExportPhotoTop(int width, int height, int margin)
+    private void DrawExportPhotoPaper(Rectangle imageArea, bool fillImageArea)
     {
-        var paper = new Rectangle(margin - 16, margin - 18, width - margin * 2 + 32, height - margin * 2 + 42);
+        var paper = GetExportPhotoPaperRectangle(imageArea);
+        if (fillImageArea)
+        {
+            _spriteBatch.Draw(_pixel, paper, _boardTheme.PhotoPaperColor);
+            return;
+        }
+
+        DrawRectangleIfPositive(new Rectangle(paper.X, paper.Y, paper.Width, imageArea.Y - paper.Y), _boardTheme.PhotoPaperColor);
+        DrawRectangleIfPositive(new Rectangle(paper.X, imageArea.Y, imageArea.X - paper.X, imageArea.Height), _boardTheme.PhotoPaperColor);
+        DrawRectangleIfPositive(new Rectangle(imageArea.Right, imageArea.Y, paper.Right - imageArea.Right, imageArea.Height), _boardTheme.PhotoPaperColor);
+        DrawRectangleIfPositive(new Rectangle(paper.X, imageArea.Bottom, paper.Width, paper.Bottom - imageArea.Bottom), _boardTheme.PhotoPaperColor);
+    }
+
+    private void DrawRectangleIfPositive(Rectangle rectangle, Color color)
+    {
+        if (rectangle.Width > 0 && rectangle.Height > 0)
+        {
+            _spriteBatch.Draw(_pixel, rectangle, color);
+        }
+    }
+    private void DrawExportPhotoTop(Rectangle imageArea)
+    {
+        var paper = GetExportPhotoPaperRectangle(imageArea);
         DrawScreenRectangleOutline(paper, _boardTheme.PhotoEdgeColor, 2);
-        var imageArea = new Rectangle(margin, margin, width - margin * 2, height - margin * 2);
         DrawScreenRectangleOutline(imageArea, new Color(130, 120, 108, 120), 1);
         DrawPin(new Vector2(paper.X + 26, paper.Y + 20), _boardTheme.PinColor);
         DrawPin(new Vector2(paper.Right - 26, paper.Y + 20), _boardTheme.PinColor);
+    }
+
+    private static Rectangle GetExportPhotoPaperRectangle(Rectangle imageArea)
+        => new(
+            imageArea.X - ExportPhotoPaperSidePadding,
+            imageArea.Y - ExportPhotoPaperTopPadding,
+            imageArea.Width + ExportPhotoPaperSidePadding * 2,
+            imageArea.Height + ExportPhotoPaperTopPadding + ExportPhotoPaperBottomPadding);
+
+    private static Rectangle GetExportPhotoShadowRectangle(Rectangle imageArea)
+    {
+        var paper = GetExportPhotoPaperRectangle(imageArea);
+        return new Rectangle(paper.X + 4, paper.Y + 8, paper.Width + 8, paper.Height + 8);
     }
 
     private void DrawPin(Vector2 center, Color color)
