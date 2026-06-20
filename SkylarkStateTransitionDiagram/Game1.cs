@@ -1185,7 +1185,6 @@ public class Game1 : Game
             return;
         }
 
-        _spriteBatch.Draw(_pixel, new Rectangle(0, 0, GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height), new Color(0, 0, 0, 94));
         if (!_exportSelectionDragging)
         {
             return;
@@ -1198,8 +1197,9 @@ public class Game1 : Game
         }
 
         DrawExportPhotoFrame(new Rectangle(0, 0, GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height), rectangle, fillBackdrop: false, fillImageArea: false);
-        _spriteBatch.Draw(_pixel, rectangle, new Color(255, 246, 210, 38));
+
         DrawExportPhotoTop(rectangle);
+
         DrawScreenRectangleOutline(rectangle, new Color(255, 236, 150), 2);
     }
 
