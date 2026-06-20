@@ -311,7 +311,7 @@ public class Game1 : Game
             if (_linkSource is not null)
             {
                 var target = FindNodeAt(mousePosition);
-                if (target is not null && target != _linkSource)
+                if (target is not null)
                 {
                     var transitionCount = _transitions.Count;
                     AddTransition(_linkSource.Id, target.Id);
@@ -445,6 +445,7 @@ public class Game1 : Game
         AddTransition(_nodes[1].Id, _nodes[2].Id);
         AddTransition(_nodes[2].Id, _nodes[1].Id);
         AddTransition(_nodes[2].Id, _nodes[3].Id);
+        AddTransition(_nodes[1].Id, _nodes[1].Id);
         _transitions[0].Label = "着手";
         _transitions[0].LabelSide = 0;
         _transitions[0].ControlPoint1 = new Vector2(340, 130);
@@ -465,6 +466,12 @@ public class Game1 : Game
         _transitions[3].LabelSide = 0;
         _transitions[3].ControlPoint1 = new Vector2(420, 560);
         _transitions[3].ControlPoint2 = new Vector2(325, 540);
+        _transitions[4].Label = "再入";
+        _transitions[4].LabelSide = 1;
+        _transitions[4].SourceAngle = -MathHelper.PiOver4;
+        _transitions[4].TargetAngle = MathHelper.PiOver4;
+        _transitions[4].ControlPoint1 = new Vector2(760, 60);
+        _transitions[4].ControlPoint2 = new Vector2(760, 380);
         _selectedNode = null;
         _selectedTransition = null;
         _status = "N: add  F2/ENTER: edit label  drag Bezier handles  SHIFT+drag: link  C: color  DEL: delete  CTRL+S/O: save/load";
@@ -559,6 +566,13 @@ public class Game1 : Game
             return;
         }
 
+        if (transition.SourceId == transition.TargetId)
+        {
+            transition.SourceAngle ??= -MathHelper.PiOver4;
+            transition.TargetAngle ??= MathHelper.PiOver4;
+            return;
+        }
+
         transition.SourceAngle ??= AngleFromTo(source.Position, target.Position);
         transition.TargetAngle ??= AngleFromTo(target.Position, source.Position);
     }
@@ -626,6 +640,21 @@ public class Game1 : Game
             control1 = Vector2.Zero;
             control2 = Vector2.Zero;
             return false;
+        }
+
+        if (transition.SourceId == transition.TargetId)
+        {
+            var node = FindNode(transition.SourceId);
+            if (node is null)
+            {
+                control1 = Vector2.Zero;
+                control2 = Vector2.Zero;
+                return false;
+            }
+
+            control1 = transition.ControlPoint1 ?? node.Position + new Vector2(DiagramNode.Radius * 2.5f, -DiagramNode.Radius * 2.2f);
+            control2 = transition.ControlPoint2 ?? node.Position + new Vector2(DiagramNode.Radius * 2.5f, DiagramNode.Radius * 2.2f);
+            return true;
         }
 
         var delta = end - start;
