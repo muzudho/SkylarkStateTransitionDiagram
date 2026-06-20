@@ -46,9 +46,13 @@ public class Game1 : Game
     private DiagramTransition? _draggedHandleTransition;
     private TransitionHandleKind _draggedHandleKind;
     private Vector2 _dragOffset;
+    private Vector2 _cameraOffset;
+    private Vector2 _panStartMouse;
+    private Vector2 _panStartCamera;
+    private bool _isPanning;
     private int _nextNodeId = 1;
     private string _editingLabel = string.Empty;
-    private string _status = "N: add  T: node kind  C: color  F2/ENTER: edit label  SHIFT+drag: link  CTRL+S/O: save/load";
+    private string _status = "N: add  T: node kind  C: color  F2/ENTER: edit label  drag empty area: pan  CTRL+S/O: save/load";
     public Game1()
     {
         _graphics = new GraphicsDeviceManager(this)
@@ -98,7 +102,7 @@ public class Game1 : Game
     protected override void Draw(GameTime gameTime)
     {
         GraphicsDevice.Clear(new Color(28, 31, 36));
-        _spriteBatch.Begin(samplerState: SamplerState.PointClamp);
+        _spriteBatch.Begin(samplerState: SamplerState.PointClamp, transformMatrix: GetViewMatrix());
         DrawGrid(40, new Color(42, 46, 52));
         foreach (var transition in _transitions)
         {
@@ -107,7 +111,7 @@ public class Game1 : Game
         if (_linkSource is not null)
         {
             var mouse = Mouse.GetState();
-            DrawArrow(_linkSource.Position, mouse.Position.ToVector2(), new Color(250, 205, 95), 3f);
+            DrawArrow(_linkSource.Position, ScreenToWorld(mouse.Position.ToVector2()), new Color(250, 205, 95), 3f);
         }
         foreach (var node in _nodes)
         {
@@ -117,6 +121,9 @@ public class Game1 : Game
         {
             DrawTransitionHandles(_selectedTransition);
         }
+        _spriteBatch.End();
+
+        _spriteBatch.Begin(samplerState: SamplerState.PointClamp);
         DrawToolbar();
         _spriteBatch.End();
         base.Draw(gameTime);
@@ -166,7 +173,7 @@ public class Game1 : Game
         }
         if (IsNewKeyPress(keyboard, Keys.N))
         {
-            AddNode(mouse.Position.ToVector2());
+            AddNode(ScreenToWorld(mouse.Position.ToVector2()));
         }
         if (IsNewKeyPress(keyboard, Keys.Delete) || IsNewKeyPress(keyboard, Keys.Back))
         {
@@ -283,12 +290,14 @@ public class Game1 : Game
     }
     private void HandleMouse(KeyboardState keyboard, MouseState mouse)
     {
-        var mousePosition = mouse.Position.ToVector2();
+        var screenMousePosition = mouse.Position.ToVector2();
+        var mousePosition = ScreenToWorld(screenMousePosition);
         var leftPressed = mouse.LeftButton == ButtonState.Pressed && _previousMouse.LeftButton == ButtonState.Released;
         var leftReleased = mouse.LeftButton == ButtonState.Released && _previousMouse.LeftButton == ButtonState.Pressed;
         var shiftDown = keyboard.IsKeyDown(Keys.LeftShift) || keyboard.IsKeyDown(Keys.RightShift);
         if (leftPressed)
         {
+            _isPanning = false;
             var handle = FindTransitionHandleAt(mousePosition);
             if (handle.Transition is not null)
             {
@@ -323,6 +332,14 @@ public class Game1 : Game
                 _dragOffset = mousePosition - node.Position;
                 _status = "Selected state. Press F2 or ENTER to edit label.";
             }
+            else if (_selectedTransition is null)
+            {
+                _isPanning = true;
+                _panStartMouse = screenMousePosition;
+                _panStartCamera = _cameraOffset;
+                _linkSource = null;
+                _status = "Panning view. Release the mouse to stop.";
+            }
         }
         if (_draggedHandleTransition is not null && mouse.LeftButton == ButtonState.Pressed)
         {
@@ -331,6 +348,10 @@ public class Game1 : Game
         if (_draggedNode is not null && mouse.LeftButton == ButtonState.Pressed)
         {
             _draggedNode.Position = mousePosition - _dragOffset;
+        }
+        if (_isPanning && mouse.LeftButton == ButtonState.Pressed)
+        {
+            _cameraOffset = _panStartCamera + screenMousePosition - _panStartMouse;
         }
         if (leftReleased)
         {
@@ -357,6 +378,11 @@ public class Game1 : Game
             _draggedNode = null;
             _draggedHandleTransition = null;
             _draggedHandleKind = TransitionHandleKind.None;
+            if (_isPanning)
+            {
+                _isPanning = false;
+                _status = "View panned. Drag empty area to pan again.";
+            }
         }
     }
     private void AddNode(Vector2 position)
@@ -503,7 +529,8 @@ public class Game1 : Game
         _transitions[4].ControlPoint2 = new Vector2(760, 380);
         _selectedNode = null;
         _selectedTransition = null;
-        _status = "N: add  T: node kind  C: color  F2/ENTER: edit label  drag Bezier handles  CTRL+S/O: save/load";
+        _cameraOffset = Vector2.Zero;
+        _status = "N: add  T: node kind  C: color  F2/ENTER: edit label  drag empty area: pan  CTRL+S/O: save/load";
     }
     private DiagramNode? FindNodeAt(Vector2 position)
     {
@@ -698,17 +725,25 @@ public class Game1 : Game
     private static float AngleFromTo(Vector2 from, Vector2 to)
         => MathF.Atan2(to.Y - from.Y, to.X - from.X);
     private DiagramNode? FindNode(int id) => _nodes.FirstOrDefault(n => n.Id == id);
+    private Matrix GetViewMatrix()
+        => Matrix.CreateTranslation(_cameraOffset.X, _cameraOffset.Y, 0f);
+    private Vector2 ScreenToWorld(Vector2 screenPosition)
+        => screenPosition - _cameraOffset;
     private void DrawGrid(int spacing, Color color)
     {
-        var width = GraphicsDevice.Viewport.Width;
-        var height = GraphicsDevice.Viewport.Height;
-        for (var x = 0; x < width; x += spacing)
+        var topLeft = ScreenToWorld(Vector2.Zero);
+        var bottomRight = ScreenToWorld(new Vector2(GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height));
+        var startX = (int)MathF.Floor(topLeft.X / spacing) * spacing;
+        var endX = (int)MathF.Ceiling(bottomRight.X / spacing) * spacing;
+        var startY = (int)MathF.Floor(topLeft.Y / spacing) * spacing;
+        var endY = (int)MathF.Ceiling(bottomRight.Y / spacing) * spacing;
+        for (var x = startX; x <= endX; x += spacing)
         {
-            DrawLine(new Vector2(x, 0), new Vector2(x, height), color, 1f);
+            DrawLine(new Vector2(x, topLeft.Y), new Vector2(x, bottomRight.Y), color, 1f);
         }
-        for (var y = 0; y < height; y += spacing)
+        for (var y = startY; y <= endY; y += spacing)
         {
-            DrawLine(new Vector2(0, y), new Vector2(width, y), color, 1f);
+            DrawLine(new Vector2(topLeft.X, y), new Vector2(bottomRight.X, y), color, 1f);
         }
     }
     private void DrawToolbar()
