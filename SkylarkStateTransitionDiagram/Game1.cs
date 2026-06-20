@@ -36,6 +36,7 @@ public class Game1 : Game
     private readonly List<DiagramNode> _nodes = new();
     private readonly List<DiagramTransition> _transitions = new();
     private readonly Dictionary<string, Texture2D> _labelTextureCache = new();
+    private readonly Dictionary<string, Texture2D> _uiTextTextureCache = new();
     private SpriteBatch _spriteBatch = null!;
     private Texture2D _pixel = null!;
     private MouseState _previousMouse;
@@ -57,7 +58,8 @@ public class Game1 : Game
     private bool _isPanning;
     private int _nextNodeId = 1;
     private string _editingLabel = string.Empty;
-    private string _status = "N: add  CTRL+N: new  T: node kind  C: color  F2/ENTER: edit label  drag resize handle: size  drag empty area: pan  CTRL+S/O: save/load";
+    private string _status = DefaultStatus;
+    private const string DefaultStatus = "N: 状態追加 / Shift+ドラッグ: 遷移作成 / F2・Enter: ラベル編集 / Ctrl+S: 保存";
     public Game1()
     {
         _graphics = new GraphicsDeviceManager(this)
@@ -113,6 +115,7 @@ public class Game1 : Game
         {
             DrawTransition(transition, transition == _selectedTransition);
         }
+        DrawHoverCue();
         if (_linkSource is not null)
         {
             var mouse = Mouse.GetState();
@@ -134,6 +137,8 @@ public class Game1 : Game
 
         _spriteBatch.Begin(samplerState: SamplerState.PointClamp);
         DrawToolbar();
+        DrawInspectorPanel();
+        DrawBottomHelp();
         _spriteBatch.End();
         base.Draw(gameTime);
     }
@@ -144,6 +149,11 @@ public class Game1 : Game
             texture.Dispose();
         }
         _labelTextureCache.Clear();
+        foreach (var texture in _uiTextTextureCache.Values)
+        {
+            texture.Dispose();
+        }
+        _uiTextTextureCache.Clear();
         base.UnloadContent();
     }
     private bool IsEditingLabel => _editingNode is not null || _editingTransition is not null;
@@ -155,7 +165,7 @@ public class Game1 : Game
         }
         if (_editingLabel.Length >= 24)
         {
-            _status = "Label is limited to 24 characters.";
+            _status = "ラベルは24文字までです。";
             return;
         }
         _editingLabel += e.Character;
@@ -213,7 +223,7 @@ public class Game1 : Game
         if (IsNewKeyPress(keyboard, Keys.R))
         {
             CreateSample();
-            _status = "Sample diagram reset.";
+            _status = "サンプル図に戻しました。";
         }
         if (IsNewKeyPress(keyboard, Keys.T) && _selectedNode is not null)
         {
@@ -224,11 +234,11 @@ public class Game1 : Game
             if (_selectedNode.Kind == NodeKind.Normal)
             {
                 _selectedNode.ColorIndex = (_selectedNode.ColorIndex + 1) % Palette.Length;
-                _status = "Changed selected state color.";
+                _status = "選択中の状態色を切り替えました。";
             }
             else
             {
-                _status = "Start and end states use fixed black. Press T to return to normal.";
+                _status = "開始・終了ノードは黒固定です。Tで通常ノードに戻せます。";
             }
         }
     }
@@ -257,7 +267,7 @@ public class Game1 : Game
         _draggedNode = null;
         _resizedNode = null;
         _linkSource = null;
-        _status = "Editing state label: type Japanese text, ENTER commits, ESC cancels.";
+        _status = "状態ラベルを編集中です。Enterで確定、Escでキャンセルします。";
     }
     private void BeginLabelEdit(DiagramTransition transition)
     {
@@ -267,7 +277,7 @@ public class Game1 : Game
         _draggedNode = null;
         _resizedNode = null;
         _linkSource = null;
-        _status = "Editing edge label: type Japanese text, ENTER commits, ESC cancels.";
+        _status = "遷移ラベルを編集中です。Enterで確定、Escでキャンセルします。";
     }
     private void CommitLabelEdit()
     {
@@ -275,12 +285,12 @@ public class Game1 : Game
         if (_editingNode is not null)
         {
             _editingNode.Label = string.IsNullOrWhiteSpace(label) ? $"状態{_editingNode.Id}" : label;
-            _status = "State label updated. CTRL+S saves UTF-8 without BOM.";
+            _status = "状態ラベルを更新しました。Ctrl+Sで保存できます。";
         }
         else if (_editingTransition is not null)
         {
             _editingTransition.Label = label;
-            _status = "Edge label updated. Press TAB to flip its side.";
+            _status = "遷移ラベルを更新しました。Tabで表示位置を切り替えられます。";
         }
         _editingNode = null;
         _editingTransition = null;
@@ -291,7 +301,7 @@ public class Game1 : Game
         _editingNode = null;
         _editingTransition = null;
         _editingLabel = string.Empty;
-        _status = "Label edit canceled.";
+        _status = "ラベル編集をキャンセルしました。";
     }
     private void ToggleNodeKind(DiagramNode node)
     {
@@ -304,14 +314,15 @@ public class Game1 : Game
 
         _status = node.Kind switch
         {
-            NodeKind.Start => "Changed selected state kind to start.",
-            NodeKind.End => "Changed selected state kind to end.",
-            _ => "Changed selected state kind to normal."
+            NodeKind.Start => "選択中の状態を開始ノードにしました。",
+            NodeKind.End => "選択中の状態を終了ノードにしました。",
+            _ => "選択中の状態を通常ノードに戻しました。"
         };
-    }    private void ToggleTransitionLabelSide(DiagramTransition transition)
+    }
+    private void ToggleTransitionLabelSide(DiagramTransition transition)
     {
         transition.LabelSide = transition.LabelSide == 0 ? 1 : 0;
-        _status = "Edge label side flipped. Horizontal edges use top/bottom; vertical edges use left/right.";
+        _status = "遷移ラベルの表示位置を切り替えました。";
     }
     private void HandleMouse(KeyboardState keyboard, MouseState mouse)
     {
@@ -333,7 +344,7 @@ public class Game1 : Game
                 _draggedHandleTransition = null;
                 _draggedHandleKind = TransitionHandleKind.None;
                 UpdateNodeRadius(_resizedNode, mousePosition);
-                _status = "Resizing state. Radius snaps to half-grid units.";
+                _status = "状態サイズを変更中です。半グリッド単位に吸着します。";
                 return;
             }
 
@@ -347,8 +358,8 @@ public class Game1 : Game
                 _draggedHandleKind = handle.Kind;
                 UpdateTransitionHandle(handle.Transition, handle.Kind, mousePosition);
                 _status = handle.Kind is TransitionHandleKind.SourceEndpoint or TransitionHandleKind.TargetEndpoint
-                    ? "Dragging edge contact point on the node circle."
-                    : "Dragging cubic Bezier control point.";
+                    ? "遷移の接点を円周上で移動中です。"
+                    : "遷移の曲がり方を調整中です。";
                 return;
             }
 
@@ -357,19 +368,19 @@ public class Game1 : Game
             _selectedTransition = node is null ? FindTransitionAt(mousePosition) : null;
             if (_selectedTransition is not null)
             {
-                _status = "Selected edge. Drag endpoint/control handles, F2/ENTER edits label.";
+                _status = "遷移を選択しました。ハンドルで形を調整、F2・Enterでラベル編集。";
             }
             if (shiftDown && node is not null)
             {
                 _linkSource = node;
-                _status = "Linking from selected state. Release on another state.";
+                _status = "遷移を作成中です。接続先の状態でマウスを離してください。";
                 return;
             }
             if (node is not null)
             {
                 _draggedNode = node;
                 _dragOffset = mousePosition - node.Position;
-                _status = "Selected state. Press F2 or ENTER to edit label.";
+                _status = "状態を選択しました。F2・Enterでラベル編集、Tで種別変更。";
             }
             else if (_selectedTransition is null)
             {
@@ -377,7 +388,7 @@ public class Game1 : Game
                 _panStartMouse = screenMousePosition;
                 _panStartCamera = _cameraOffset;
                 _linkSource = null;
-                _status = "Panning view. Release the mouse to stop.";
+                _status = "表示位置を移動中です。マウスを離すと停止します。";
             }
         }
         if (_draggedHandleTransition is not null && mouse.LeftButton == ButtonState.Pressed)
@@ -410,24 +421,24 @@ public class Game1 : Game
                     {
                         _selectedNode = null;
                         _selectedTransition = _transitions.LastOrDefault();
-                        _status = "Linked states. Drag Bezier handles or press F2/ENTER to edit edge label.";
+                        _status = "遷移を作成しました。ハンドルで形を調整、F2・Enterでラベル編集。";
                     }
                 }
                 _linkSource = null;
             }
             if (_draggedHandleTransition is not null)
             {
-                _status = "Edge handle moved. CTRL+S saves it.";
+                _status = "遷移の形を更新しました。Ctrl+Sで保存できます。";
             }
             if (_draggedNode is not null)
             {
                 _status = snapNodes
-                    ? "State moved. Center snapped to half-grid units. CTRL+S saves it."
-                    : "State moved without snapping. CTRL+S saves it.";
+                    ? "状態を移動しました。中心は半グリッドに吸着しています。"
+                    : "状態を移動しました。Alt中は吸着しません。";
             }
             if (_resizedNode is not null)
             {
-                _status = $"State radius set to {_resizedNode.RadiusUnits} half-grid unit(s). CTRL+S saves it.";
+                _status = $"状態サイズを{_resizedNode.RadiusUnits}単位にしました。Ctrl+Sで保存できます。";
             }
             _draggedNode = null;
             _resizedNode = null;
@@ -436,7 +447,7 @@ public class Game1 : Game
             if (_isPanning)
             {
                 _isPanning = false;
-                _status = "View panned. Drag empty area to pan again.";
+                _status = "表示位置を移動しました。空白をドラッグするとまた移動できます。";
             }
         }
     }
@@ -453,13 +464,13 @@ public class Game1 : Game
         _nodes.Add(node);
         _selectedNode = node;
         _selectedTransition = null;
-        _status = "Added state. Press F2 or ENTER to edit label.";
+        _status = "状態を追加しました。F2・Enterでラベルを編集できます。";
     }
     private void AddTransition(int sourceId, int targetId)
     {
         if (_transitions.Any(t => t.SourceId == sourceId && t.TargetId == targetId))
         {
-            _status = "That transition already exists.";
+            _status = "同じ向きの遷移は既にあります。";
             return;
         }
         var transition = new DiagramTransition { SourceId = sourceId, TargetId = targetId };
@@ -473,7 +484,7 @@ public class Game1 : Game
             var id = _selectedNode.Id;
             _nodes.Remove(_selectedNode);
             _transitions.RemoveAll(t => t.SourceId == id || t.TargetId == id);
-            _status = "Deleted selected state.";
+            _status = "選択中の状態を削除しました。";
             _selectedNode = null;
             return;
         }
@@ -481,7 +492,7 @@ public class Game1 : Game
         {
             _transitions.Remove(_selectedTransition);
             _selectedTransition = null;
-            _status = "Deleted selected transition.";
+            _status = "選択中の遷移を削除しました。";
         }
     }
     private void SaveDiagram()
@@ -507,7 +518,7 @@ public class Game1 : Game
         };
         if (dialog.ShowDialog() != true)
         {
-            _status = "Save canceled.";
+            _status = "保存をキャンセルしました。";
             return;
         }
         SaveDiagramToPath(dialog.FileName);
@@ -518,7 +529,7 @@ public class Game1 : Game
         var json = JsonSerializer.Serialize(document, DiagramJsonOptions);
         File.WriteAllText(path, json, Utf8NoBom);
         _currentFilePath = path;
-        _status = $"Saved {Path.GetFileName(path)} as UTF-8 without BOM.";
+        _status = $"{Path.GetFileName(path)} を保存しました。";
     }
     private void LoadDiagram()
     {
@@ -539,7 +550,7 @@ public class Game1 : Game
         };
         if (dialog.ShowDialog() != true)
         {
-            _status = "Load canceled.";
+            _status = "読込をキャンセルしました。";
             return;
         }
         LoadDiagramFromPath(dialog.FileName);
@@ -548,13 +559,13 @@ public class Game1 : Game
     {
         if (!File.Exists(path))
         {
-            _status = $"No {Path.GetFileName(path)} found.";
+            _status = $"{Path.GetFileName(path)} が見つかりません。";
             return;
         }
         var document = JsonSerializer.Deserialize<DiagramDocument>(File.ReadAllText(path, Encoding.UTF8), DiagramJsonOptions);
         if (document is null)
         {
-            _status = "Could not load diagram.";
+            _status = "状態遷移図を読み込めませんでした。";
             return;
         }
         _nodes.Clear();
@@ -569,7 +580,7 @@ public class Game1 : Game
         _selectedNode = null;
         _selectedTransition = null;
         _currentFilePath = path;
-        _status = $"Loaded {Path.GetFileName(path)}.";
+        _status = $"{Path.GetFileName(path)} を読み込みました。";
     }
     private void LoadOrCreateSample()
     {
@@ -644,7 +655,7 @@ public class Game1 : Game
         _selectedNode = null;
         _selectedTransition = null;
         _cameraOffset = Vector2.Zero;
-        _status = "N: add  CTRL+N: new  T: node kind  C: color  F2/ENTER: edit label  drag resize handle: size  drag empty area: pan  CTRL+S/O: save/load";
+        _status = DefaultStatus;
     }
     private DiagramNode? FindNodeAt(Vector2 position)
     {
@@ -886,12 +897,116 @@ public class Game1 : Game
             DrawLine(new Vector2(topLeft.X, y), new Vector2(bottomRight.X, y), color, 1f);
         }
     }
+    private void DrawHoverCue()
+    {
+        if (IsEditingLabel || _draggedNode is not null || _resizedNode is not null || _draggedHandleTransition is not null || _isPanning || _linkSource is not null)
+        {
+            return;
+        }
+
+        var mouse = Mouse.GetState();
+        var mouseWorld = ScreenToWorld(mouse.Position.ToVector2());
+        var handle = FindTransitionHandleAt(mouseWorld);
+        if (handle.Transition is not null && TryGetTransitionGeometry(handle.Transition, out var start, out var control1, out var control2, out var end))
+        {
+            var center = handle.Kind switch
+            {
+                TransitionHandleKind.SourceEndpoint => start,
+                TransitionHandleKind.TargetEndpoint => end,
+                TransitionHandleKind.ControlPoint1 => control1,
+                TransitionHandleKind.ControlPoint2 => control2,
+                _ => Vector2.Zero
+            };
+            if (center != Vector2.Zero)
+            {
+                DrawCircleOutline(center, 13f, new Color(255, 245, 170), 3f);
+            }
+            return;
+        }
+
+        var node = FindNodeAt(mouseWorld);
+        if (node is not null)
+        {
+            if (node != _selectedNode)
+            {
+                DrawCircleOutline(node.Position, node.Radius + 8f, new Color(130, 185, 230), 3f);
+            }
+            return;
+        }
+
+        var transition = FindTransitionAt(mouseWorld);
+        if (transition is not null && transition != _selectedTransition && TryGetTransitionGeometry(transition, out start, out control1, out control2, out end))
+        {
+            DrawBezierArrow(start, control1, control2, end, new Color(115, 170, 220, 180), 5f);
+        }
+    }
+
     private void DrawToolbar()
     {
-        var bounds = new Rectangle(0, 0, GraphicsDevice.Viewport.Width, 34);
-        _spriteBatch.Draw(_pixel, bounds, new Color(18, 20, 24));
-        DrawText(_status.ToUpperInvariant(), new Vector2(12, 10), new Color(230, 234, 240), 2);
+        var width = GraphicsDevice.Viewport.Width;
+        var bounds = new Rectangle(0, 0, width, 58);
+        _spriteBatch.Draw(_pixel, bounds, new Color(17, 19, 23, 238));
+        _spriteBatch.Draw(_pixel, new Rectangle(0, bounds.Height - 1, width, 1), new Color(65, 72, 84));
+        DrawUiText("Skylark State Transition Diagram", new Vector2(12, 8), new Color(245, 247, 250), 18, true);
+        DrawUiText(_status, new Vector2(12, 32), new Color(210, 220, 232), 16, false);
     }
+
+    private void DrawInspectorPanel()
+    {
+        var width = GraphicsDevice.Viewport.Width;
+        if (width < 560)
+        {
+            return;
+        }
+
+        const int panelWidth = 290;
+        var x = width - panelWidth - 12;
+        var bounds = new Rectangle(x, 70, panelWidth, 96);
+        _spriteBatch.Draw(_pixel, bounds, new Color(22, 25, 31, 218));
+        _spriteBatch.Draw(_pixel, new Rectangle(bounds.X, bounds.Y, bounds.Width, 1), new Color(82, 92, 108));
+        _spriteBatch.Draw(_pixel, new Rectangle(bounds.X, bounds.Bottom - 1, bounds.Width, 1), new Color(8, 10, 14));
+
+        DrawUiText($"状態: {_nodes.Count}    遷移: {_transitions.Count}", new Vector2(x + 12, bounds.Y + 10), new Color(236, 240, 245), 16, true);
+        DrawUiText(GetSelectionSummary(), new Vector2(x + 12, bounds.Y + 36), new Color(196, 210, 226), 15, false);
+        DrawUiText(GetFileSummary(), new Vector2(x + 12, bounds.Y + 62), new Color(170, 184, 202), 14, false);
+    }
+
+    private void DrawBottomHelp()
+    {
+        var viewport = GraphicsDevice.Viewport;
+        if (viewport.Height < 360)
+        {
+            return;
+        }
+
+        var y = viewport.Height - 34;
+        _spriteBatch.Draw(_pixel, new Rectangle(0, y, viewport.Width, 34), new Color(17, 19, 23, 210));
+        DrawUiText("Alt: 吸着なし / Tab: 遷移ラベル位置 / Delete: 削除 / 空白ドラッグ: 表示移動", new Vector2(12, y + 9), new Color(188, 201, 218), 14, false);
+    }
+
+    private string GetSelectionSummary()
+    {
+        if (_selectedNode is not null)
+        {
+            var kind = _selectedNode.Kind switch
+            {
+                NodeKind.Start => "開始",
+                NodeKind.End => "終了",
+                _ => "通常"
+            };
+            return $"選択: 状態 {_selectedNode.Id} / {kind} / サイズ {_selectedNode.RadiusUnits}";
+        }
+
+        if (_selectedTransition is not null)
+        {
+            return $"選択: 遷移 {_selectedTransition.SourceId} -> {_selectedTransition.TargetId}";
+        }
+
+        return "選択: なし";
+    }
+
+    private string GetFileSummary()
+        => _currentFilePath is null ? "保存先: 未指定" : $"保存先: {Path.GetFileName(_currentFilePath)}";
     private void DrawNode(DiagramNode node, bool selected)
     {
         var fill = node.Kind == NodeKind.Normal ? Palette[node.ColorIndex % Palette.Length] : new Color(5, 6, 8);
@@ -928,6 +1043,54 @@ public class Game1 : Game
         var position = center - new Vector2(texture.Width / 2f, texture.Height / 2f);
         _spriteBatch.Draw(texture, position, Color.White);
     }
+    private void DrawUiText(string text, Vector2 position, Color color, float size, bool bold)
+    {
+        var texture = GetUiTextTexture(text, size, bold);
+        _spriteBatch.Draw(texture, position, color);
+    }
+
+    private Texture2D GetUiTextTexture(string text, float size, bool bold)
+    {
+        var cacheKey = $"ui|{size}|{bold}|{text}";
+        if (_uiTextTextureCache.TryGetValue(cacheKey, out var cached))
+        {
+            return cached;
+        }
+
+        var texture = CreateUiTextTexture(GraphicsDevice, text, size, bold);
+        _uiTextTextureCache[cacheKey] = texture;
+        return texture;
+    }
+
+    private static Texture2D CreateUiTextTexture(GraphicsDevice graphicsDevice, string text, float size, bool bold)
+    {
+        var renderedText = string.IsNullOrEmpty(text) ? " " : text;
+        using var font = CreateJapaneseFont(size, bold);
+        using var measureBitmap = new DrawingBitmap(1, 1);
+        using var measureGraphics = DrawingGraphics.FromImage(measureBitmap);
+        var measured = measureGraphics.MeasureString(renderedText, font, 1024, StringFormatNoWrap);
+        var width = Math.Clamp((int)Math.Ceiling(measured.Width) + 4, 8, 1024);
+        var height = Math.Clamp((int)Math.Ceiling(measured.Height) + 4, 8, 64);
+        using var bitmap = new DrawingBitmap(width, height, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+        using var graphics = DrawingGraphics.FromImage(bitmap);
+        graphics.Clear(DrawingColor.Transparent);
+        graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
+        graphics.DrawString(renderedText, font, DrawingBrushes.White, new DrawingRectangleF(0, 0, width, height), LeftAlignedStringFormat);
+
+        var colors = new Color[width * height];
+        for (var y = 0; y < height; y++)
+        {
+            for (var x = 0; x < width; x++)
+            {
+                var pixel = bitmap.GetPixel(x, y);
+                colors[y * width + x] = new Color(pixel.R, pixel.G, pixel.B, pixel.A);
+            }
+        }
+
+        var texture = new Texture2D(graphicsDevice, width, height);
+        texture.SetData(colors);
+        return texture;
+    }
     private Texture2D GetLabelTexture(string label, bool editing)
     {
         var cacheKey = $"{(editing ? "edit" : "label")}|{label}";
@@ -942,7 +1105,7 @@ public class Game1 : Game
     private static Texture2D CreateLabelTexture(GraphicsDevice graphicsDevice, string label, bool editing)
     {
         var text = string.IsNullOrEmpty(label) ? " " : label;
-        using var font = CreateJapaneseFont(22);
+        using var font = CreateJapaneseFont(22, true);
         using var measureBitmap = new DrawingBitmap(1, 1);
         using var measureGraphics = DrawingGraphics.FromImage(measureBitmap);
         var measured = measureGraphics.MeasureString(text, font, 512, StringFormatNoWrap);
@@ -972,21 +1135,27 @@ public class Game1 : Game
         texture.SetData(colors);
         return texture;
     }
-    private static DrawingFont CreateJapaneseFont(float size)
+    private static DrawingFont CreateJapaneseFont(float size, bool bold)
     {
         var candidates = new[] { "Yu Gothic UI", "Meiryo", "MS Gothic", "Noto Sans CJK JP", "Arial Unicode MS" };
         foreach (var candidate in candidates)
         {
             if (DrawingFontFamily.Families.Any(f => string.Equals(f.Name, candidate, StringComparison.OrdinalIgnoreCase)))
             {
-                return new DrawingFont(candidate, size, DrawingFontStyle.Bold, DrawingGraphicsUnit.Pixel);
+                return new DrawingFont(candidate, size, bold ? DrawingFontStyle.Bold : DrawingFontStyle.Regular, DrawingGraphicsUnit.Pixel);
             }
         }
-        return new DrawingFont(DrawingFontFamily.GenericSansSerif, size, DrawingFontStyle.Bold, DrawingGraphicsUnit.Pixel);
+        return new DrawingFont(DrawingFontFamily.GenericSansSerif, size, bold ? DrawingFontStyle.Bold : DrawingFontStyle.Regular, DrawingGraphicsUnit.Pixel);
     }
     private static readonly DrawingStringFormat CenteredStringFormat = new()
     {
         Alignment = System.Drawing.StringAlignment.Center,
+        LineAlignment = System.Drawing.StringAlignment.Center,
+        FormatFlags = DrawingStringFormatFlags.NoWrap
+    };
+    private static readonly DrawingStringFormat LeftAlignedStringFormat = new()
+    {
+        Alignment = System.Drawing.StringAlignment.Near,
         LineAlignment = System.Drawing.StringAlignment.Center,
         FormatFlags = DrawingStringFormatFlags.NoWrap
     };
