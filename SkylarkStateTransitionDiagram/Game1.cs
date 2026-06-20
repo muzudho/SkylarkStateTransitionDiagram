@@ -133,7 +133,10 @@ public class Game1 : Game
         if (_isExportSelecting)
         {
             HandleExportSelectionKeyboard(keyboard);
-            HandleExportSelectionMouse(keyboard, mouse);
+            if (_isExportSelecting)
+            {
+                HandleExportSelectionMouse(keyboard, mouse);
+            }
         }
         else if (IsEditingLabel)
         {
@@ -333,7 +336,14 @@ public class Game1 : Game
         var screenPosition = mouse.Position.ToVector2();
         var leftPressed = mouse.LeftButton == ButtonState.Pressed && _previousMouse.LeftButton == ButtonState.Released;
         var leftReleased = mouse.LeftButton == ButtonState.Released && _previousMouse.LeftButton == ButtonState.Pressed;
+        var rightPressed = mouse.RightButton == ButtonState.Pressed && _previousMouse.RightButton == ButtonState.Released;
         var snapSelection = !IsAltDown(keyboard);
+
+        if (rightPressed)
+        {
+            CancelPngExportSelection("PNG出力をキャンセルしました。");
+            return;
+        }
 
         if (leftPressed)
         {
@@ -352,11 +362,11 @@ public class Game1 : Game
             if (_exportDragMode == ExportSelectionDragMode.New)
             {
                 _exportSelectionRectangle = new Rectangle((int)screenPosition.X, (int)screenPosition.Y, 0, 0);
-                _status = "PNG範囲を作成中です。半グリッドに吸着、Alt中は吸着なし。";
+                _status = "PNG範囲を作成中です。左ドラッグで範囲、Alt中は吸着なし、右クリックでキャンセル。";
             }
             else
             {
-                _status = "PNG範囲を調整中です。半グリッドに吸着、Alt中は吸着なし。";
+                _status = "PNG範囲を調整中です。左ドラッグで調整、Alt中は吸着なし、右クリックでキャンセル。";
             }
             return;
         }
@@ -380,8 +390,8 @@ public class Game1 : Game
 
             _hasExportSelection = true;
             _status = snapSelection
-                ? "PNG範囲を半グリッドに吸着して調整しました。Altで吸着なし、Enterで撮影。"
-                : "PNG範囲を自由位置で調整しました。Altを離すと半グリッド吸着、Enterで撮影。";
+                ? "PNG範囲を半グリッドに吸着しました。左ドラッグで調整、Enterで撮影、右クリックでキャンセル。"
+                : "PNG範囲を自由位置にしました。Altを離すと吸着、Enterで撮影、右クリックでキャンセル。";
         }
     }
 
@@ -399,7 +409,7 @@ public class Game1 : Game
         _draggedHandleKind = TransitionHandleKind.None;
         _linkSource = null;
         _isPanning = false;
-        _status = "PNG出力モードです。左ドラッグで範囲作成、半グリッド吸着、Altで吸着なし、Enterで撮影。";
+        _status = "PNG出力モードです。左ドラッグで範囲作成、Altで吸着なし、Enterで撮影、右クリック/Escでキャンセル。";
     }
 
     private void CancelPngExportSelection(string status)
@@ -1511,6 +1521,20 @@ public class Game1 : Game
         _spriteBatch.Draw(_pixel, new Rectangle(0, y, viewport.Width, 34), new Color(17, 19, 23, 210));
 
         var position = new Vector2(12, y + 6);
+        if (_isExportSelecting)
+        {
+            position = DrawShortcutHint(position, "左ドラッグ", "範囲作成・調整");
+            position = DrawHelpSeparator(position);
+            position = DrawShortcutHint(position, "Enter", "撮影");
+            position = DrawHelpSeparator(position);
+            position = DrawShortcutHint(position, "Alt", "吸着なし");
+            position = DrawHelpSeparator(position);
+            position = DrawShortcutHint(position, "右クリック/Esc", "キャンセル");
+            return;
+        }
+
+        position = DrawShortcutHint(position, "Ctrl+P", "PNG出力");
+        position = DrawHelpSeparator(position);
         position = DrawShortcutHint(position, "Alt", "吸着なし");
         position = DrawHelpSeparator(position);
         position = DrawShortcutHint(position, "Tab", "遷移ラベル位置");
