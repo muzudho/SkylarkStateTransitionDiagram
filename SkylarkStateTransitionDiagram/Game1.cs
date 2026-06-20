@@ -27,6 +27,32 @@ using Microsoft.Xna.Framework.Input;
 public class Game1 : Game
 {
     private const string SaveFileName = "diagram.json";
+    private static readonly Keys[] ThemeDigitKeys =
+    [
+        Keys.D0,
+        Keys.D1,
+        Keys.D2,
+        Keys.D3,
+        Keys.D4,
+        Keys.D5,
+        Keys.D6,
+        Keys.D7,
+        Keys.D8,
+        Keys.D9
+    ];
+    private static readonly Keys[] ThemeNumPadKeys =
+    [
+        Keys.NumPad0,
+        Keys.NumPad1,
+        Keys.NumPad2,
+        Keys.NumPad3,
+        Keys.NumPad4,
+        Keys.NumPad5,
+        Keys.NumPad6,
+        Keys.NumPad7,
+        Keys.NumPad8,
+        Keys.NumPad9
+    ];
     private static readonly UTF8Encoding Utf8NoBom = new(false);
     private static readonly JsonSerializerOptions DiagramJsonOptions = new()
     {
@@ -38,7 +64,7 @@ public class Game1 : Game
     private readonly List<DiagramTransition> _transitions = new();
     private readonly Dictionary<string, Texture2D> _labelTextureCache = new();
     private readonly Dictionary<string, Texture2D> _uiTextTextureCache = new();
-    private readonly IKeyCapTheme _keyCapTheme = KeyCapThemes.Current;
+    private IKeyCapTheme _keyCapTheme = KeyCapThemes.Current;
     private SpriteBatch _spriteBatch = null!;
     private Texture2D _pixel = null!;
     private MouseState _previousMouse;
@@ -196,6 +222,11 @@ public class Game1 : Game
             LoadDiagramFromDialog();
             return;
         }
+        if (TryGetThemeShortcutIndex(keyboard, out var themeIndex))
+        {
+            ApplyKeyCapTheme(themeIndex);
+            return;
+        }
         if (IsNewKeyPress(keyboard, Keys.F2) || IsNewKeyPress(keyboard, Keys.Enter))
         {
             if (_selectedNode is not null)
@@ -244,6 +275,32 @@ public class Game1 : Game
             }
         }
     }
+    private bool TryGetThemeShortcutIndex(KeyboardState keyboard, out int themeIndex)
+    {
+        for (var i = 0; i < ThemeDigitKeys.Length; i++)
+        {
+            if (IsNewKeyPress(keyboard, ThemeDigitKeys[i]) || IsNewKeyPress(keyboard, ThemeNumPadKeys[i]))
+            {
+                themeIndex = i;
+                return true;
+            }
+        }
+
+        themeIndex = -1;
+        return false;
+    }
+
+    private void ApplyKeyCapTheme(int themeIndex)
+    {
+        if (themeIndex < 0 || themeIndex >= KeyCapThemes.ShortcutThemes.Count)
+        {
+            return;
+        }
+
+        _keyCapTheme = KeyCapThemes.ShortcutThemes[themeIndex];
+        _status = $"キーキャップテーマを {themeIndex}: {_keyCapTheme.Name} に切り替えました。";
+    }
+
     private void HandleLabelEditingKeyboard(KeyboardState keyboard)
     {
         if (IsNewKeyPress(keyboard, Keys.Enter))
@@ -990,6 +1047,8 @@ public class Game1 : Game
         position = DrawShortcutHint(position, "Tab", "遷移ラベル位置");
         position = DrawHelpSeparator(position);
         position = DrawShortcutHint(position, "Delete", "削除");
+        position = DrawHelpSeparator(position);
+        position = DrawShortcutHint(position, "0-9", "テーマ");
         position = DrawHelpSeparator(position);
         DrawShortcutHint(position, "空白", "表示移動");
     }
