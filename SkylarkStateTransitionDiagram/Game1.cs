@@ -43,12 +43,12 @@ public class Game1 : Game
     private DiagramNode? _linkSource;
     private DiagramNode? _editingNode;
     private DiagramTransition? _editingTransition;
-    private DiagramTransition? _draggedEndpointTransition;
-    private bool _draggedEndpointIsSource;
+    private DiagramTransition? _draggedHandleTransition;
+    private TransitionHandleKind _draggedHandleKind;
     private Vector2 _dragOffset;
     private int _nextNodeId = 1;
     private string _editingLabel = string.Empty;
-    private string _status = "N: add  F2/ENTER: edit label  drag edge endpoints  SHIFT+drag: link  CTRL+S/O: save/load";
+    private string _status = "N: add  F2/ENTER: edit label  drag edge handles  SHIFT+drag: link  CTRL+S/O: save/load";
     public Game1()
     {
         _graphics = new GraphicsDeviceManager(this)
@@ -263,16 +263,18 @@ public class Game1 : Game
         var shiftDown = keyboard.IsKeyDown(Keys.LeftShift) || keyboard.IsKeyDown(Keys.RightShift);
         if (leftPressed)
         {
-            var endpoint = FindTransitionEndpointAt(mousePosition);
-            if (endpoint.Transition is not null)
+            var handle = FindTransitionHandleAt(mousePosition);
+            if (handle.Transition is not null)
             {
                 _selectedNode = null;
-                _selectedTransition = endpoint.Transition;
+                _selectedTransition = handle.Transition;
                 _draggedNode = null;
-                _draggedEndpointTransition = endpoint.Transition;
-                _draggedEndpointIsSource = endpoint.IsSource;
-                UpdateTransitionEndpoint(endpoint.Transition, endpoint.IsSource, mousePosition);
-                _status = "Dragging edge contact point on the node circle.";
+                _draggedHandleTransition = handle.Transition;
+                _draggedHandleKind = handle.Kind;
+                UpdateTransitionHandle(handle.Transition, handle.Kind, mousePosition);
+                _status = handle.Kind is TransitionHandleKind.SourceEndpoint or TransitionHandleKind.TargetEndpoint
+                    ? "Dragging edge contact point on the node circle."
+                    : "Dragging cubic Bezier control point.";
                 return;
             }
 
@@ -281,7 +283,7 @@ public class Game1 : Game
             _selectedTransition = node is null ? FindTransitionAt(mousePosition) : null;
             if (_selectedTransition is not null)
             {
-                _status = "Selected edge. Drag endpoint handles, F2/ENTER edits label, TAB flips label side.";
+                _status = "Selected edge. Drag endpoint/control handles, F2/ENTER edits label.";
             }
             if (shiftDown && node is not null)
             {
@@ -296,9 +298,9 @@ public class Game1 : Game
                 _status = "Selected state. Press F2 or ENTER to edit label.";
             }
         }
-        if (_draggedEndpointTransition is not null && mouse.LeftButton == ButtonState.Pressed)
+        if (_draggedHandleTransition is not null && mouse.LeftButton == ButtonState.Pressed)
         {
-            UpdateTransitionEndpoint(_draggedEndpointTransition, _draggedEndpointIsSource, mousePosition);
+            UpdateTransitionHandle(_draggedHandleTransition, _draggedHandleKind, mousePosition);
         }
         if (_draggedNode is not null && mouse.LeftButton == ButtonState.Pressed)
         {
@@ -317,20 +319,20 @@ public class Game1 : Game
                     {
                         _selectedNode = null;
                         _selectedTransition = _transitions.LastOrDefault();
-                        _status = "Linked states. Drag edge contact points or press F2/ENTER to edit edge label.";
+                        _status = "Linked states. Drag Bezier handles or press F2/ENTER to edit edge label.";
                     }
                 }
                 _linkSource = null;
             }
-            if (_draggedEndpointTransition is not null)
+            if (_draggedHandleTransition is not null)
             {
-                _status = "Edge contact point moved. CTRL+S saves it.";
+                _status = "Edge handle moved. CTRL+S saves it.";
             }
             _draggedNode = null;
-            _draggedEndpointTransition = null;
+            _draggedHandleTransition = null;
+            _draggedHandleKind = TransitionHandleKind.None;
         }
-    }
-    private void AddNode(Vector2 position)
+    }    private void AddNode(Vector2 position)
     {
         var node = new DiagramNode
         {
@@ -445,19 +447,27 @@ public class Game1 : Game
         AddTransition(_nodes[2].Id, _nodes[3].Id);
         _transitions[0].Label = "着手";
         _transitions[0].LabelSide = 0;
+        _transitions[0].ControlPoint1 = new Vector2(340, 130);
+        _transitions[0].ControlPoint2 = new Vector2(430, 145);
         _transitions[1].Label = "確認";
         _transitions[1].LabelSide = 1;
         _transitions[1].SourceAngle = MathHelper.PiOver2;
         _transitions[1].TargetAngle = -MathHelper.PiOver2;
+        _transitions[1].ControlPoint1 = new Vector2(635, 320);
+        _transitions[1].ControlPoint2 = new Vector2(635, 390);
         _transitions[2].Label = "差戻し";
         _transitions[2].LabelSide = 0;
         _transitions[2].SourceAngle = -MathHelper.PiOver2;
         _transitions[2].TargetAngle = MathHelper.PiOver2;
+        _transitions[2].ControlPoint1 = new Vector2(405, 390);
+        _transitions[2].ControlPoint2 = new Vector2(405, 320);
         _transitions[3].Label = "承認";
         _transitions[3].LabelSide = 0;
+        _transitions[3].ControlPoint1 = new Vector2(420, 560);
+        _transitions[3].ControlPoint2 = new Vector2(325, 540);
         _selectedNode = null;
         _selectedTransition = null;
-        _status = "N: add  F2/ENTER: edit label  TAB: flip edge label  SHIFT+drag: link  C: color  DEL: delete  CTRL+S/O: save/load";
+        _status = "N: add  F2/ENTER: edit label  drag Bezier handles  SHIFT+drag: link  C: color  DEL: delete  CTRL+S/O: save/load";
     }
     private DiagramNode? FindNodeAt(Vector2 position)
     {
@@ -474,12 +484,12 @@ public class Game1 : Game
     {
         foreach (var transition in _transitions)
         {
-            if (!TryGetTransitionEndpoints(transition, out var start, out var end))
+            if (!TryGetTransitionGeometry(transition, out var start, out var control1, out var control2, out var end))
             {
                 continue;
             }
 
-            if (DistanceToSegment(position, start, end) <= 8f)
+            if (DistanceToBezier(position, start, control1, control2, end) <= 8f)
             {
                 return transition;
             }
@@ -487,27 +497,57 @@ public class Game1 : Game
         return null;
     }
 
-    private TransitionEndpointHit FindTransitionEndpointAt(Vector2 position)
+    private TransitionHandleHit FindTransitionHandleAt(Vector2 position)
     {
+        if (_selectedTransition is not null && TryGetTransitionHandleAt(_selectedTransition, position, out var selectedHit))
+        {
+            return selectedHit;
+        }
+
         foreach (var transition in Enumerable.Reverse(_transitions))
         {
-            if (!TryGetTransitionEndpoints(transition, out var start, out var end))
+            if (TryGetTransitionHandleAt(transition, position, out var hit))
             {
-                continue;
-            }
-
-            if (Vector2.Distance(position, start) <= 14f)
-            {
-                return new TransitionEndpointHit(transition, true);
-            }
-
-            if (Vector2.Distance(position, end) <= 14f)
-            {
-                return new TransitionEndpointHit(transition, false);
+                return hit;
             }
         }
 
-        return new TransitionEndpointHit(null, false);
+        return new TransitionHandleHit(null, TransitionHandleKind.None);
+    }
+
+    private bool TryGetTransitionHandleAt(DiagramTransition transition, Vector2 position, out TransitionHandleHit hit)
+    {
+        hit = new TransitionHandleHit(null, TransitionHandleKind.None);
+        if (!TryGetTransitionGeometry(transition, out var start, out var control1, out var control2, out var end))
+        {
+            return false;
+        }
+
+        if (Vector2.Distance(position, start) <= 14f)
+        {
+            hit = new TransitionHandleHit(transition, TransitionHandleKind.SourceEndpoint);
+            return true;
+        }
+
+        if (Vector2.Distance(position, end) <= 14f)
+        {
+            hit = new TransitionHandleHit(transition, TransitionHandleKind.TargetEndpoint);
+            return true;
+        }
+
+        if (Vector2.Distance(position, control1) <= 14f)
+        {
+            hit = new TransitionHandleHit(transition, TransitionHandleKind.ControlPoint1);
+            return true;
+        }
+
+        if (Vector2.Distance(position, control2) <= 14f)
+        {
+            hit = new TransitionHandleHit(transition, TransitionHandleKind.ControlPoint2);
+            return true;
+        }
+
+        return false;
     }
 
     private void InitializeTransitionEndpoints(DiagramTransition transition)
@@ -521,6 +561,25 @@ public class Game1 : Game
 
         transition.SourceAngle ??= AngleFromTo(source.Position, target.Position);
         transition.TargetAngle ??= AngleFromTo(target.Position, source.Position);
+    }
+
+    private void UpdateTransitionHandle(DiagramTransition transition, TransitionHandleKind kind, Vector2 mousePosition)
+    {
+        switch (kind)
+        {
+            case TransitionHandleKind.SourceEndpoint:
+                UpdateTransitionEndpoint(transition, true, mousePosition);
+                break;
+            case TransitionHandleKind.TargetEndpoint:
+                UpdateTransitionEndpoint(transition, false, mousePosition);
+                break;
+            case TransitionHandleKind.ControlPoint1:
+                transition.ControlPoint1 = mousePosition;
+                break;
+            case TransitionHandleKind.ControlPoint2:
+                transition.ControlPoint2 = mousePosition;
+                break;
+        }
     }
 
     private void UpdateTransitionEndpoint(DiagramTransition transition, bool isSource, Vector2 mousePosition)
@@ -557,6 +616,21 @@ public class Game1 : Game
         var targetAngle = transition.TargetAngle ?? AngleFromTo(target.Position, source.Position);
         start = PointOnCircle(source.Position, DiagramNode.Radius, sourceAngle);
         end = PointOnCircle(target.Position, DiagramNode.Radius, targetAngle);
+        return true;
+    }
+
+    private bool TryGetTransitionGeometry(DiagramTransition transition, out Vector2 start, out Vector2 control1, out Vector2 control2, out Vector2 end)
+    {
+        if (!TryGetTransitionEndpoints(transition, out start, out end))
+        {
+            control1 = Vector2.Zero;
+            control2 = Vector2.Zero;
+            return false;
+        }
+
+        var delta = end - start;
+        control1 = transition.ControlPoint1 ?? start + delta / 3f;
+        control2 = transition.ControlPoint2 ?? start + delta * 2f / 3f;
         return true;
     }
 
@@ -668,33 +742,37 @@ public class Game1 : Game
     };
     private void DrawTransition(DiagramTransition transition, bool selected)
     {
-        if (!TryGetTransitionEndpoints(transition, out var start, out var end))
+        if (!TryGetTransitionGeometry(transition, out var start, out var control1, out var control2, out var end))
         {
             return;
         }
 
-        if ((end - start).LengthSquared() <= 0.01f)
-        {
-            return;
-        }
-
-        DrawArrow(start, end, selected ? new Color(255, 230, 120) : new Color(185, 195, 210), selected ? 4f : 3f);
-        DrawTransitionLabel(transition, start, end, selected);
+        DrawBezierArrow(start, control1, control2, end, selected ? new Color(255, 230, 120) : new Color(185, 195, 210), selected ? 4f : 3f);
+        DrawTransitionLabel(transition, start, control1, control2, end, selected);
     }
 
     private void DrawTransitionHandles(DiagramTransition transition)
     {
-        if (!TryGetTransitionEndpoints(transition, out var start, out var end))
+        if (!TryGetTransitionGeometry(transition, out var start, out var control1, out var control2, out var end))
         {
             return;
         }
 
-        DrawCircle(start, 8f, new Color(255, 230, 120));
-        DrawCircleOutline(start, 8f, new Color(20, 24, 30), 2f);
-        DrawCircle(end, 8f, new Color(255, 230, 120));
-        DrawCircleOutline(end, 8f, new Color(20, 24, 30), 2f);
+        DrawLine(start, control1, new Color(95, 120, 145), 1f);
+        DrawLine(end, control2, new Color(95, 120, 145), 1f);
+        DrawHandle(start, new Color(255, 230, 120));
+        DrawHandle(end, new Color(255, 230, 120));
+        DrawHandle(control1, new Color(80, 190, 230));
+        DrawHandle(control2, new Color(80, 190, 230));
     }
-    private void DrawTransitionLabel(DiagramTransition transition, Vector2 start, Vector2 end, bool selected)
+
+    private void DrawHandle(Vector2 center, Color color)
+    {
+        DrawCircle(center, 8f, color);
+        DrawCircleOutline(center, 8f, new Color(20, 24, 30), 2f);
+    }
+
+    private void DrawTransitionLabel(DiagramTransition transition, Vector2 start, Vector2 control1, Vector2 control2, Vector2 end, bool selected)
     {
         var editing = transition == _editingTransition;
         var label = editing ? _editingLabel + "_" : transition.Label;
@@ -703,20 +781,67 @@ public class Game1 : Game
             return;
         }
         var texture = GetLabelTexture(label, editing || selected);
-        var center = GetTransitionLabelCenter(start, end, transition.LabelSide, texture);
+        var center = GetTransitionLabelCenter(start, control1, control2, end, transition.LabelSide, texture);
         var position = center - new Vector2(texture.Width / 2f, texture.Height / 2f);
         _spriteBatch.Draw(texture, position, Color.White);
     }
-    private static Vector2 GetTransitionLabelCenter(Vector2 start, Vector2 end, int labelSide, Texture2D labelTexture)
+
+    private static Vector2 GetTransitionLabelCenter(Vector2 start, Vector2 control1, Vector2 control2, Vector2 end, int labelSide, Texture2D labelTexture)
     {
-        var midpoint = (start + end) * 0.5f;
-        var delta = end - start;
+        var midpoint = CubicBezier(start, control1, control2, end, 0.5f);
+        var tangent = CubicBezierTangent(start, control1, control2, end, 0.5f);
         var side = labelSide == 0 ? -1f : 1f;
-        if (MathF.Abs(delta.X) >= MathF.Abs(delta.Y))
+        if (MathF.Abs(tangent.X) >= MathF.Abs(tangent.Y))
         {
             return midpoint + new Vector2(0, side * (labelTexture.Height / 2f + 18f));
         }
         return midpoint + new Vector2(side * (labelTexture.Width / 2f + 22f), 0);
+    }
+
+    private void DrawBezierArrow(Vector2 start, Vector2 control1, Vector2 control2, Vector2 end, Color color, float thickness)
+    {
+        const int segments = 32;
+        var previous = start;
+        for (var i = 1; i <= segments; i++)
+        {
+            var t = i / (float)segments;
+            var current = CubicBezier(start, control1, control2, end, t);
+            DrawLine(previous, current, color, thickness);
+            previous = current;
+        }
+
+        var tangent = CubicBezierTangent(start, control1, control2, end, 1f);
+        DrawArrowHead(end, tangent, color, thickness);
+    }
+
+    private void DrawArrowHead(Vector2 tip, Vector2 tangent, Color color, float thickness)
+    {
+        if (tangent.LengthSquared() <= 0.01f)
+        {
+            return;
+        }
+
+        var direction = Vector2.Normalize(tangent);
+        var normal = new Vector2(-direction.Y, direction.X);
+        DrawLine(tip, tip - direction * 18 + normal * 8, color, thickness);
+        DrawLine(tip, tip - direction * 18 - normal * 8, color, thickness);
+    }
+
+    private static Vector2 CubicBezier(Vector2 start, Vector2 control1, Vector2 control2, Vector2 end, float t)
+    {
+        var u = 1f - t;
+        return u * u * u * start
+            + 3f * u * u * t * control1
+            + 3f * u * t * t * control2
+            + t * t * t * end;
+    }
+
+    private static Vector2 CubicBezierTangent(Vector2 start, Vector2 control1, Vector2 control2, Vector2 end, float t)
+    {
+        var u = 1f - t;
+        return 3f * u * u * (control1 - start)
+            + 6f * u * t * (control2 - control1)
+            + 3f * t * t * (end - control2);
     }
     private void DrawArrow(Vector2 start, Vector2 end, Color color, float thickness)
     {
@@ -765,6 +890,21 @@ public class Game1 : Game
         => keyboard.IsKeyDown(key) && !_previousKeyboard.IsKeyDown(key);
     private static bool IsControlDown(KeyboardState keyboard)
         => keyboard.IsKeyDown(Keys.LeftControl) || keyboard.IsKeyDown(Keys.RightControl);
+    private static float DistanceToBezier(Vector2 point, Vector2 start, Vector2 control1, Vector2 control2, Vector2 end)
+    {
+        const int segments = 32;
+        var best = float.MaxValue;
+        var previous = start;
+        for (var i = 1; i <= segments; i++)
+        {
+            var t = i / (float)segments;
+            var current = CubicBezier(start, control1, control2, end, t);
+            best = MathF.Min(best, DistanceToSegment(point, previous, current));
+            previous = current;
+        }
+
+        return best;
+    }
     private static float DistanceToSegment(Vector2 point, Vector2 a, Vector2 b)
     {
         var ab = b - a;
@@ -808,8 +948,18 @@ public sealed class DiagramTransition
     public int LabelSide { get; set; }
     public float? SourceAngle { get; set; }
     public float? TargetAngle { get; set; }
+    public Vector2? ControlPoint1 { get; set; }
+    public Vector2? ControlPoint2 { get; set; }
 }
-public sealed record TransitionEndpointHit(DiagramTransition? Transition, bool IsSource);
+public sealed record TransitionHandleHit(DiagramTransition? Transition, TransitionHandleKind Kind);
+public enum TransitionHandleKind
+{
+    None,
+    SourceEndpoint,
+    TargetEndpoint,
+    ControlPoint1,
+    ControlPoint2
+}
 public static class PrimitiveText
 {
     private static readonly Dictionary<char, string[]> Glyphs = new()
