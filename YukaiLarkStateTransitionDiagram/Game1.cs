@@ -1,4 +1,5 @@
 namespace YukaiLarkStateTransitionDiagram;
+
 using YukaiLarkStateTransitionDiagram.Theme;
 using YukaiLarkStateTransitionDiagram.Navigation;
 using YukaiLarkStateTransitionDiagram.Persistence;
@@ -6,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using OpenFileDialog = Microsoft.Win32.OpenFileDialog;
 using SaveFileDialog = Microsoft.Win32.SaveFileDialog;
@@ -16,6 +18,7 @@ public class Game1 : Game
 {
     private const string AppTitle = "YukaiLark State Transition Diagram";
     private const string SaveFileName = "diagram.json";
+    private const int MaxHistoryCount = 100;
     private const int ExportPhotoImageMargin = 34;
     private const int ExportPhotoPaperSidePadding = 16;
     private const int ExportPhotoPaperTopPadding = 18;
@@ -50,6 +53,8 @@ public class Game1 : Game
     private readonly GraphicsDeviceManager _graphics;
     private readonly List<DiagramNode> _nodes = new();
     private readonly List<DiagramTransition> _transitions = new();
+    private readonly Stack<DiagramDocument> _undoHistory = new();
+    private readonly Stack<DiagramDocument> _redoHistory = new();
     private readonly Dictionary<string, Texture2D> _labelTextureCache = new();
     private readonly Dictionary<string, Texture2D> _uiTextTextureCache = new();
     private PrimitiveRenderer _primitiveRenderer = null!;
@@ -73,6 +78,8 @@ public class Game1 : Game
     private TransitionHandleKind _draggedHandleKind;
     private DiagramNode? _resizedNode;
     private string? _currentFilePath;
+    private DiagramDocument? _pendingHistorySnapshot;
+    private bool _suppressHistory;
     private Vector2 _dragOffset;
     private Vector2 _cameraOffset;
     private Vector2 _panStartMouse;
@@ -88,7 +95,7 @@ public class Game1 : Game
     private int _nextNodeId = 1;
     private string _editingLabel = string.Empty;
     private string _status = DefaultStatus;
-    private const string DefaultStatus = "N: 状態追加 / Shift+ドラッグ: 遷移作成 / F2・Enter: ラベル編集 / Ctrl+S: 保存 / Ctrl+P: PNG";
+    private const string DefaultStatus = "N: 状態追加 / Shift+ドラッグ: 遷移作成 / F2・Enter: ラベル編集 / Ctrl+Z/Y: 元に戻す/やり直し / Ctrl+S: 保存";
     public Game1()
     {
         _graphics = new GraphicsDeviceManager(this)
@@ -200,6 +207,23 @@ public class Game1 : Game
     }
     private void HandleKeyboard(KeyboardState keyboard, MouseState mouse)
     {
+        if (IsControlDown(keyboard) && IsNewKeyPress(keyboard, Keys.Z))
+        {
+            if (IsShiftDown(keyboard))
+            {
+                RedoDiagramChange();
+            }
+            else
+            {
+                UndoDiagramChange();
+            }
+            return;
+        }
+        if (IsControlDown(keyboard) && IsNewKeyPress(keyboard, Keys.Y))
+        {
+            RedoDiagramChange();
+            return;
+        }
         if (IsControlDown(keyboard) && IsNewKeyPress(keyboard, Keys.N))
         {
             CreateNewDiagram();
@@ -271,7 +295,10 @@ public class Game1 : Game
         {
             if (_selectedNode.Kind == NodeKind.Normal)
             {
-                _selectedNode.ColorIndex = (_selectedNode.ColorIndex + 1) % Palette.Length;
+                ExecuteUndoableChange(() =>
+                {
+                    _selectedNode.ColorIndex = (_selectedNode.ColorIndex + 1) % Palette.Length;
+                });
                 _status = "選択中の状態色を切り替えました。";
             }
             else
@@ -280,6 +307,170 @@ public class Game1 : Game
             }
         }
     }
+    private void ExecuteUndoableChange(Action change)
+    {
+        if (_suppressHistory)
+        {
+            change();
+            return;
+        }
+
+        var before = CaptureDiagramDocument();
+        change();
+        if (!AreDiagramDocumentsEqual(before, CaptureDiagramDocument()))
+        {
+            PushHistorySnapshot(_undoHistory, before);
+            _redoHistory.Clear();
+        }
+    }
+
+    private void BeginPendingHistory()
+    {
+        if (_suppressHistory || _pendingHistorySnapshot is not null)
+        {
+            return;
+        }
+
+        _pendingHistorySnapshot = CaptureDiagramDocument();
+    }
+
+    private void CommitPendingHistory()
+    {
+        if (_suppressHistory || _pendingHistorySnapshot is null)
+        {
+            _pendingHistorySnapshot = null;
+            return;
+        }
+
+        if (!AreDiagramDocumentsEqual(_pendingHistorySnapshot, CaptureDiagramDocument()))
+        {
+            PushHistorySnapshot(_undoHistory, _pendingHistorySnapshot);
+            _redoHistory.Clear();
+        }
+        _pendingHistorySnapshot = null;
+    }
+
+    private void UndoDiagramChange()
+    {
+        _pendingHistorySnapshot = null;
+        if (_undoHistory.Count == 0)
+        {
+            _status = "元に戻せる操作はありません。";
+            return;
+        }
+
+        var current = CaptureDiagramDocument();
+        var previous = _undoHistory.Pop();
+        PushHistorySnapshot(_redoHistory, current);
+        ApplyDiagramDocument(previous);
+        _status = "操作を元に戻しました。Ctrl+Yでやり直せます。";
+    }
+
+    private void RedoDiagramChange()
+    {
+        _pendingHistorySnapshot = null;
+        if (_redoHistory.Count == 0)
+        {
+            _status = "やり直せる操作はありません。";
+            return;
+        }
+
+        var current = CaptureDiagramDocument();
+        var next = _redoHistory.Pop();
+        PushHistorySnapshot(_undoHistory, current);
+        ApplyDiagramDocument(next);
+        _status = "操作をやり直しました。Ctrl+Zで元に戻せます。";
+    }
+
+    private void ClearHistory()
+    {
+        _undoHistory.Clear();
+        _redoHistory.Clear();
+        _pendingHistorySnapshot = null;
+    }
+
+    private void PushHistorySnapshot(Stack<DiagramDocument> history, DiagramDocument document)
+    {
+        history.Push(CloneDiagramDocument(document));
+        if (history.Count <= MaxHistoryCount)
+        {
+            return;
+        }
+
+        var snapshots = history.Reverse().Skip(1).ToList();
+        history.Clear();
+        foreach (var snapshot in snapshots)
+        {
+            history.Push(snapshot);
+        }
+    }
+
+    private DiagramDocument CaptureDiagramDocument()
+        => CloneDiagramDocument(new DiagramDocument { Nodes = _nodes, Transitions = _transitions });
+
+    private void ApplyDiagramDocument(DiagramDocument document)
+    {
+        var snapshot = CloneDiagramDocument(document);
+        _nodes.Clear();
+        _transitions.Clear();
+        _nodes.AddRange(snapshot.Nodes);
+        _transitions.AddRange(snapshot.Transitions);
+        foreach (var transition in _transitions)
+        {
+            InitializeTransitionEndpoints(transition);
+        }
+
+        _nextNodeId = _nodes.Count == 0 ? 1 : _nodes.Max(n => n.Id) + 1;
+        _selectedNode = null;
+        _selectedTransition = null;
+        _draggedNode = null;
+        _linkSource = null;
+        _editingNode = null;
+        _editingTransition = null;
+        _draggedHandleTransition = null;
+        _draggedHandleKind = TransitionHandleKind.None;
+        _resizedNode = null;
+        _editingLabel = string.Empty;
+        _isPanning = false;
+        _isExportSelecting = false;
+        _exportSelectionDragging = false;
+        _hasExportSelection = false;
+    }
+
+    private static DiagramDocument CloneDiagramDocument(DiagramDocument document)
+        => new()
+        {
+            FormatVersion = document.FormatVersion,
+            Nodes = document.Nodes.Select(CloneDiagramNode).ToList(),
+            Transitions = document.Transitions.Select(CloneDiagramTransition).ToList()
+        };
+
+    private static DiagramNode CloneDiagramNode(DiagramNode node)
+        => new()
+        {
+            Id = node.Id,
+            Label = node.Label,
+            Position = node.Position,
+            RadiusUnits = node.RadiusUnits,
+            ColorIndex = node.ColorIndex,
+            Kind = node.Kind
+        };
+
+    private static DiagramTransition CloneDiagramTransition(DiagramTransition transition)
+        => new()
+        {
+            SourceId = transition.SourceId,
+            TargetId = transition.TargetId,
+            Label = transition.Label,
+            LabelSide = transition.LabelSide,
+            SourceAngle = transition.SourceAngle,
+            TargetAngle = transition.TargetAngle,
+            ControlPoint1 = transition.ControlPoint1,
+            ControlPoint2 = transition.ControlPoint2
+        };
+
+    private static bool AreDiagramDocumentsEqual(DiagramDocument left, DiagramDocument right)
+        => JsonSerializer.Serialize(left, YukaiDialogJsonSerializer.Options) == JsonSerializer.Serialize(right, YukaiDialogJsonSerializer.Options);
     private bool TryGetThemeShortcutIndex(KeyboardState keyboard, out int themeIndex)
     {
         for (var i = 0; i < ThemeDigitKeys.Length; i++)
@@ -664,12 +855,19 @@ public class Game1 : Game
         var label = _editingLabel.Trim();
         if (_editingNode is not null)
         {
-            _editingNode.Label = string.IsNullOrWhiteSpace(label) ? $"状態{_editingNode.Id}" : label;
+            var newLabel = string.IsNullOrWhiteSpace(label) ? $"状態{_editingNode.Id}" : label;
+            if (_editingNode.Label != newLabel)
+            {
+                ExecuteUndoableChange(() => _editingNode.Label = newLabel);
+            }
             _status = "状態ラベルを更新しました。Ctrl+Sで保存できます。";
         }
         else if (_editingTransition is not null)
         {
-            _editingTransition.Label = label;
+            if (_editingTransition.Label != label)
+            {
+                ExecuteUndoableChange(() => _editingTransition.Label = label);
+            }
             _status = "遷移ラベルを更新しました。Tabでラベル左右を切り替えられます。";
         }
         _editingNode = null;
@@ -685,12 +883,15 @@ public class Game1 : Game
     }
     private void ToggleNodeKind(DiagramNode node)
     {
-        node.Kind = node.Kind switch
+        ExecuteUndoableChange(() =>
         {
-            NodeKind.Normal => NodeKind.Start,
-            NodeKind.Start => NodeKind.End,
-            _ => NodeKind.Normal
-        };
+            node.Kind = node.Kind switch
+            {
+                NodeKind.Normal => NodeKind.Start,
+                NodeKind.Start => NodeKind.End,
+                _ => NodeKind.Normal
+            };
+        });
 
         _status = node.Kind switch
         {
@@ -701,7 +902,10 @@ public class Game1 : Game
     }
     private void ToggleTransitionLabelSide(DiagramTransition transition)
     {
-        transition.LabelSide = transition.LabelSide == 0 ? 1 : 0;
+        ExecuteUndoableChange(() =>
+        {
+            transition.LabelSide = transition.LabelSide == 0 ? 1 : 0;
+        });
         _status = "遷移ラベルを左右で切り替えました。";
     }
     private void HandleMouse(KeyboardState keyboard, MouseState mouse)
@@ -723,6 +927,7 @@ public class Game1 : Game
                 _draggedNode = null;
                 _draggedHandleTransition = null;
                 _draggedHandleKind = TransitionHandleKind.None;
+                BeginPendingHistory();
                 UpdateNodeRadius(_resizedNode, mousePosition);
                 _status = "状態サイズを変更中です。半グリッド単位に吸着します。";
                 return;
@@ -736,6 +941,7 @@ public class Game1 : Game
                 _draggedNode = null;
                 _draggedHandleTransition = handle.Transition;
                 _draggedHandleKind = handle.Kind;
+                BeginPendingHistory();
                 UpdateTransitionHandle(handle.Transition, handle.Kind, mousePosition);
                 _status = handle.Kind is TransitionHandleKind.SourceEndpoint or TransitionHandleKind.TargetEndpoint
                     ? "遷移の接点を円周上で移動中です。"
@@ -760,6 +966,7 @@ public class Game1 : Game
             {
                 _draggedNode = node;
                 _dragOffset = mousePosition - node.Position;
+                BeginPendingHistory();
                 _status = "状態を選択しました。F2・Enterでラベル編集、Tで種別変更。";
             }
             else if (_selectedTransition is null)
@@ -808,16 +1015,19 @@ public class Game1 : Game
             }
             if (_draggedHandleTransition is not null)
             {
+                CommitPendingHistory();
                 _status = "遷移の形を更新しました。Ctrl+Sで保存できます。";
             }
             if (_draggedNode is not null)
             {
+                CommitPendingHistory();
                 _status = snapNodes
                     ? "状態を移動しました。中心は半グリッドに吸着しています。"
                     : "状態を移動しました。Alt中は吸着しません。";
             }
             if (_resizedNode is not null)
             {
+                CommitPendingHistory();
                 _status = $"状態サイズを{_resizedNode.RadiusUnits}単位にしました。Ctrl+Sで保存できます。";
             }
             _draggedNode = null;
@@ -833,17 +1043,20 @@ public class Game1 : Game
     }
     private void AddNode(Vector2 position)
     {
-        var node = new DiagramNode
+        ExecuteUndoableChange(() =>
         {
-            Id = _nextNodeId++,
-            Label = $"状態{_nextNodeId - 1}",
-            Position = SnapToHalfGrid(position),
-            RadiusUnits = DiagramNode.DefaultRadiusUnits,
-            ColorIndex = (_nextNodeId - 2) % Palette.Length
-        };
-        _nodes.Add(node);
-        _selectedNode = node;
-        _selectedTransition = null;
+            var node = new DiagramNode
+            {
+                Id = _nextNodeId++,
+                Label = $"状態{_nextNodeId - 1}",
+                Position = SnapToHalfGrid(position),
+                RadiusUnits = DiagramNode.DefaultRadiusUnits,
+                ColorIndex = (_nextNodeId - 2) % Palette.Length
+            };
+            _nodes.Add(node);
+            _selectedNode = node;
+            _selectedTransition = null;
+        });
         _status = "状態を追加しました。F2・Enterでラベルを編集できます。";
     }
     private void AddTransition(int sourceId, int targetId)
@@ -853,24 +1066,32 @@ public class Game1 : Game
             _status = "同じ向きの遷移は既にあります。";
             return;
         }
-        var transition = new DiagramTransition { SourceId = sourceId, TargetId = targetId };
-        InitializeTransitionEndpoints(transition);
-        _transitions.Add(transition);
+        ExecuteUndoableChange(() =>
+        {
+            var transition = new DiagramTransition { SourceId = sourceId, TargetId = targetId };
+            InitializeTransitionEndpoints(transition);
+            _transitions.Add(transition);
+        });
     }
     private void DeleteSelection()
     {
         if (_selectedNode is not null)
         {
-            var id = _selectedNode.Id;
-            _nodes.Remove(_selectedNode);
-            _transitions.RemoveAll(t => t.SourceId == id || t.TargetId == id);
+            var node = _selectedNode;
+            ExecuteUndoableChange(() =>
+            {
+                var id = node.Id;
+                _nodes.Remove(node);
+                _transitions.RemoveAll(t => t.SourceId == id || t.TargetId == id);
+            });
             _status = "選択中の状態を削除しました。";
             _selectedNode = null;
             return;
         }
         if (_selectedTransition is not null)
         {
-            _transitions.Remove(_selectedTransition);
+            var transition = _selectedTransition;
+            ExecuteUndoableChange(() => _transitions.Remove(transition));
             _selectedTransition = null;
             _status = "選択中の遷移を削除しました。";
         }
@@ -959,6 +1180,7 @@ public class Game1 : Game
         _selectedNode = null;
         _selectedTransition = null;
         _currentFilePath = path;
+        ClearHistory();
         _status = $"{Path.GetFileName(path)} を読み込みました。";
     }
     private void LoadOrCreateSample()
@@ -977,7 +1199,7 @@ public class Game1 : Game
                 _transitions.Clear();
             }
         }
-        CreateSample();
+        CreateSample(trackHistory: false);
     }
 
     /// <summary>
@@ -985,7 +1207,7 @@ public class Game1 : Game
     /// </summary>
     private void CreateNewDiagram()
     {
-        ClearDiagram();
+        ExecuteUndoableChange(ClearDiagram);
         _currentFilePath = null;
         SaveDiagramAs();
     }
@@ -1008,6 +1230,7 @@ public class Game1 : Game
         _draggedHandleKind = TransitionHandleKind.None;
         _resizedNode = null;
         _editingLabel = string.Empty;
+        _pendingHistorySnapshot = null;
         _cameraOffset = Vector2.Zero;
         _isPanning = false;
         _isExportSelecting = false;
@@ -1018,53 +1241,68 @@ public class Game1 : Game
         _exportDragMode = ExportSelectionDragMode.New;
         _status = DefaultStatus;
     }
-    private void CreateSample()
+    private void CreateSample(bool trackHistory = true)
     {
-        ClearDiagram();
-        AddNode(new Vector2(230, 220));
-        AddNode(new Vector2(530, 220));
-        AddNode(new Vector2(530, 480));
-        AddNode(new Vector2(230, 480));
-        _nodes[0].Label = "開始";
-        _nodes[0].Kind = NodeKind.Start;
-        _nodes[1].Label = "下書き";
-        _nodes[2].Label = "レビュー";
-        _nodes[3].Label = "終了";
-        _nodes[3].Kind = NodeKind.End;
-        AddTransition(_nodes[0].Id, _nodes[1].Id);
-        AddTransition(_nodes[1].Id, _nodes[2].Id);
-        AddTransition(_nodes[2].Id, _nodes[1].Id);
-        AddTransition(_nodes[2].Id, _nodes[3].Id);
-        AddTransition(_nodes[1].Id, _nodes[1].Id);
-        _transitions[0].Label = "着手";
-        _transitions[0].LabelSide = 0;
-        _transitions[0].ControlPoint1 = new Vector2(340, 130);
-        _transitions[0].ControlPoint2 = new Vector2(430, 145);
-        _transitions[1].Label = "確認";
-        _transitions[1].LabelSide = 1;
-        _transitions[1].SourceAngle = MathHelper.PiOver2;
-        _transitions[1].TargetAngle = -MathHelper.PiOver2;
-        _transitions[1].ControlPoint1 = new Vector2(635, 320);
-        _transitions[1].ControlPoint2 = new Vector2(635, 390);
-        _transitions[2].Label = "差戻し";
-        _transitions[2].LabelSide = 0;
-        _transitions[2].SourceAngle = -MathHelper.PiOver2;
-        _transitions[2].TargetAngle = MathHelper.PiOver2;
-        _transitions[2].ControlPoint1 = new Vector2(405, 390);
-        _transitions[2].ControlPoint2 = new Vector2(405, 320);
-        _transitions[3].Label = "承認";
-        _transitions[3].LabelSide = 0;
-        _transitions[3].ControlPoint1 = new Vector2(420, 560);
-        _transitions[3].ControlPoint2 = new Vector2(325, 540);
-        _transitions[4].Label = "再入";
-        _transitions[4].LabelSide = 1;
-        _transitions[4].SourceAngle = -MathHelper.PiOver4;
-        _transitions[4].TargetAngle = MathHelper.PiOver4;
-        _transitions[4].ControlPoint1 = new Vector2(760, 60);
-        _transitions[4].ControlPoint2 = new Vector2(760, 380);
-        _selectedNode = null;
-        _selectedTransition = null;
-        _status = DefaultStatus;
+        if (trackHistory && !_suppressHistory)
+        {
+            ExecuteUndoableChange(() => CreateSample(trackHistory: false));
+            return;
+        }
+
+        var wasSuppressingHistory = _suppressHistory;
+        _suppressHistory = true;
+        try
+        {
+            ClearDiagram();
+            AddNode(new Vector2(230, 220));
+            AddNode(new Vector2(530, 220));
+            AddNode(new Vector2(530, 480));
+            AddNode(new Vector2(230, 480));
+            _nodes[0].Label = "開始";
+            _nodes[0].Kind = NodeKind.Start;
+            _nodes[1].Label = "下書き";
+            _nodes[2].Label = "レビュー";
+            _nodes[3].Label = "終了";
+            _nodes[3].Kind = NodeKind.End;
+            AddTransition(_nodes[0].Id, _nodes[1].Id);
+            AddTransition(_nodes[1].Id, _nodes[2].Id);
+            AddTransition(_nodes[2].Id, _nodes[1].Id);
+            AddTransition(_nodes[2].Id, _nodes[3].Id);
+            AddTransition(_nodes[1].Id, _nodes[1].Id);
+            _transitions[0].Label = "着手";
+            _transitions[0].LabelSide = 0;
+            _transitions[0].ControlPoint1 = new Vector2(340, 130);
+            _transitions[0].ControlPoint2 = new Vector2(430, 145);
+            _transitions[1].Label = "確認";
+            _transitions[1].LabelSide = 1;
+            _transitions[1].SourceAngle = MathHelper.PiOver2;
+            _transitions[1].TargetAngle = -MathHelper.PiOver2;
+            _transitions[1].ControlPoint1 = new Vector2(635, 320);
+            _transitions[1].ControlPoint2 = new Vector2(635, 390);
+            _transitions[2].Label = "差戻し";
+            _transitions[2].LabelSide = 0;
+            _transitions[2].SourceAngle = -MathHelper.PiOver2;
+            _transitions[2].TargetAngle = MathHelper.PiOver2;
+            _transitions[2].ControlPoint1 = new Vector2(405, 390);
+            _transitions[2].ControlPoint2 = new Vector2(405, 320);
+            _transitions[3].Label = "承認";
+            _transitions[3].LabelSide = 0;
+            _transitions[3].ControlPoint1 = new Vector2(420, 560);
+            _transitions[3].ControlPoint2 = new Vector2(325, 540);
+            _transitions[4].Label = "再入";
+            _transitions[4].LabelSide = 1;
+            _transitions[4].SourceAngle = -MathHelper.PiOver4;
+            _transitions[4].TargetAngle = MathHelper.PiOver4;
+            _transitions[4].ControlPoint1 = new Vector2(760, 60);
+            _transitions[4].ControlPoint2 = new Vector2(760, 380);
+            _selectedNode = null;
+            _selectedTransition = null;
+            _status = DefaultStatus;
+        }
+        finally
+        {
+            _suppressHistory = wasSuppressingHistory;
+        }
     }
     private DiagramNode? FindNodeAt(Vector2 position)
     {
