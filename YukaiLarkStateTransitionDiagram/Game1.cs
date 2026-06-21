@@ -1,12 +1,11 @@
 namespace YukaiLarkStateTransitionDiagram;
 using YukaiLarkStateTransitionDiagram.Theme;
 using YukaiLarkStateTransitionDiagram.Navigation;
+using YukaiLarkStateTransitionDiagram.Persistence;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
-using System.Text.Json;
 using System.Text.Json.Serialization;
 using OpenFileDialog = Microsoft.Win32.OpenFileDialog;
 using SaveFileDialog = Microsoft.Win32.SaveFileDialog;
@@ -47,12 +46,6 @@ public class Game1 : Game
         Keys.NumPad8,
         Keys.NumPad9
     ];
-    private static readonly UTF8Encoding Utf8NoBom = new(false);
-    private static readonly JsonSerializerOptions DiagramJsonOptions = new()
-    {
-        WriteIndented = true,
-        IncludeFields = true
-    };
     private readonly GraphicsDeviceManager _graphics;
     private readonly List<DiagramNode> _nodes = new();
     private readonly List<DiagramTransition> _transitions = new();
@@ -909,8 +902,7 @@ public class Game1 : Game
     private void SaveDiagramToPath(string path)
     {
         var document = new DiagramDocument { Nodes = _nodes, Transitions = _transitions };
-        var json = JsonSerializer.Serialize(document, DiagramJsonOptions);
-        File.WriteAllText(path, json, Utf8NoBom);
+        YukaiDialogJsonWriter.Write(path, document);
         _currentFilePath = path;
         _status = $"{Path.GetFileName(path)} を保存しました。";
     }
@@ -945,7 +937,7 @@ public class Game1 : Game
             _status = $"{Path.GetFileName(path)} が見つかりません。";
             return;
         }
-        var document = JsonSerializer.Deserialize<DiagramDocument>(File.ReadAllText(path, Encoding.UTF8), DiagramJsonOptions);
+        var document = YukaiDialogJsonReader.Read(path);
         if (document is null)
         {
             _status = "状態遷移図を読み込めませんでした。";
@@ -1846,3 +1838,4 @@ public static class PrimitiveText
         }
     }
 }
+
