@@ -165,6 +165,7 @@ public class Game1 : Game
             gameTime.TotalGameTime,
             IsEditingLabel,
             _isExportSelecting,
+            _hasExportSelection,
             _selectedNode,
             _selectedTransition);
         DrawExportSelectionOverlay();

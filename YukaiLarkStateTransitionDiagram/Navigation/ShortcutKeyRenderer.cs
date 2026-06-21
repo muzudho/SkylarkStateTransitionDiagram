@@ -53,6 +53,7 @@ public sealed class ShortcutKeyRenderer : IDisposable
     /// <param name="totalGameTime">ゲーム開始からの経過時間</param>
     /// <param name="isEditingLabel">ラベル編集中かどうか</param>
     /// <param name="isExportSelecting">エクスポート選択中かどうか</param>
+    /// <param name="hasExportSelection">エクスポート範囲が作成済みかどうか</param>
     /// <param name="selectedNode">選択されているノード</param>
     /// <param name="selectedTransition">選択されている遷移</param>
     public void DrawBottomHelp(
@@ -60,6 +61,7 @@ public sealed class ShortcutKeyRenderer : IDisposable
         TimeSpan totalGameTime,
         bool isEditingLabel,
         bool isExportSelecting,
+        bool hasExportSelection,
         DiagramNode? selectedNode,
         DiagramTransition? selectedTransition)
     {
@@ -71,7 +73,7 @@ public sealed class ShortcutKeyRenderer : IDisposable
         var y = viewport.Height - 34;
         _spriteBatch.Draw(_pixel, new Rectangle(0, y, viewport.Width, 34), new Color(17, 19, 23, 210));
 
-        var pages = GetHelpPages(isEditingLabel, isExportSelecting, selectedNode, selectedTransition);
+        var pages = GetHelpPages(isEditingLabel, isExportSelecting, hasExportSelection, selectedNode, selectedTransition);
         if (pages.Length == 0)
         {
             return;
@@ -143,29 +145,29 @@ public sealed class ShortcutKeyRenderer : IDisposable
     private static HelpPage[] GetHelpPages(
         bool isEditingLabel,
         bool isExportSelecting,
+        bool hasExportSelection,
         DiagramNode? selectedNode,
         DiagramTransition? selectedTransition)
     {
         if (isExportSelecting)
         {
+            var exportHints = new List<HelpHint>
+            {
+                new("左ドラッグ", "範囲作成・調整"),
+                new("Alt+ドラッグ", "吸着なし"),
+                new("右クリック/Esc", "キャンセル")
+            };
+
+            if (hasExportSelection)
+            {
+                exportHints.Insert(1, new HelpHint("Enter", "撮影"));
+            }
+
             return
             [
                 new HelpPage
                 (
-                    [
-                        new HelpHint("左ドラッグ", "範囲作成・調整"),
-                        new HelpHint("Enter", "撮影"),
-                        new HelpHint("Alt", "吸着なし"),
-                        new HelpHint("右クリック/Esc", "キャンセル")
-                    ]
-                ),
-                new HelpPage
-                (
-                    [
-                        new HelpHint("Ctrl+P", "PNG出力開始"),
-                        new HelpHint("0-9", "テーマ"),
-                        new HelpHint("空白", "表示移動")
-                    ]
+                    exportHints.ToArray()
                 )
             ];
         }
@@ -218,16 +220,23 @@ public sealed class ShortcutKeyRenderer : IDisposable
 
         if (selectedNode is not null)
         {
+            var nodeHints = new List<HelpHint>
+            {
+                new("F2・Enter", "ラベル編集"),
+                new("T", "状態種別変更"),
+                new("Delete", "状態削除")
+            };
+
+            if (selectedNode.Kind == NodeKind.Normal)
+            {
+                nodeHints.Add(new HelpHint("C", "状態色変更"));
+            }
+
             return
             [
                 new HelpPage
                 (
-                    [
-                        new HelpHint("F2・Enter", "ラベル編集"),
-                        new HelpHint("T", "状態種別変更"),
-                        new HelpHint("C", "状態色変更"),
-                        new HelpHint("Delete", "状態削除")
-                    ]
+                    nodeHints.ToArray()
                 ),
                 new HelpPage
                 (
@@ -269,18 +278,9 @@ public sealed class ShortcutKeyRenderer : IDisposable
             new HelpPage
             (
                 [
-                    new HelpHint("F2・Enter", "ラベル編集"),
-                    new HelpHint("T", "状態種別変更"),
-                    new HelpHint("C", "状態色変更"),
-                    new HelpHint("Delete", "削除")
-                ]
-            ),
-            new HelpPage
-            (
-                [
                     new HelpHint("Shift+ドラッグ", "遷移作成"),
                     new HelpHint("Shift+同一状態", "自己ループ"),
-                    new HelpHint("Tab", "ラベル左右切替")
+                    new HelpHint("空白ドラッグ", "表示移動")
                 ]
             ),
             new HelpPage
@@ -288,7 +288,7 @@ public sealed class ShortcutKeyRenderer : IDisposable
                 [
                     new HelpHint("Ctrl+P", "PNG出力"),
                     new HelpHint("0-9", "テーマ"),
-                    new HelpHint("空白", "表示移動")
+                    new HelpHint("空白ドラッグ", "表示移動")
                 ]
             )
         ];
