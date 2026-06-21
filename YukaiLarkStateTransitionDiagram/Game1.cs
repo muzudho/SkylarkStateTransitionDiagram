@@ -1227,7 +1227,7 @@ public class Game1 : Game
         return true;
     }
 
-    private const float TransitionHeadPadding = 6f;
+    private const float TransitionHeadPadding = 12f;
 
     private bool TryGetTransitionGeometry(DiagramTransition transition, out Vector2 start, out Vector2 control1, out Vector2 control2, out Vector2 end)
     {

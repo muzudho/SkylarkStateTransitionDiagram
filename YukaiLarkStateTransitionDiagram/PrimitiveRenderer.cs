@@ -45,7 +45,8 @@ public sealed class PrimitiveRenderer
             return;
         }
 
-        _spriteBatch.Draw(_pixel, start, null, color, (float)Math.Atan2(delta.Y, delta.X), Vector2.Zero, new Vector2(length, thickness), SpriteEffects.None, 0f);
+        // ［矢終］の羽を描く。
+        _spriteBatch.Draw(_pixel, start, null, color, (float)Math.Atan2(delta.Y, delta.X), new Vector2(0f, 0.5f), new Vector2(length, thickness), SpriteEffects.None, 0f);
     }
 
     /// <summary>

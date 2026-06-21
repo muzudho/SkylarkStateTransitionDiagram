@@ -1,7 +1,6 @@
 namespace YukaiLarkStateTransitionDiagram;
 
 using System;
-using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
@@ -224,9 +223,10 @@ public sealed class EdgeRenderer
 
         // 向き。
         var direction = Vector2.Normalize(tangent);
+        var arrowEndLocation = tip;
 
         // 矢印の頭の左右の羽を描く
-        DrawSymmetricArrowHead(tip, direction, color, thickness);
+        DrawSymmetricArrowHead(arrowEndLocation, direction, color, thickness);
     }
 
     /// <summary>
