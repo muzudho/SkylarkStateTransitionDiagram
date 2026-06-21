@@ -941,6 +941,9 @@ public class Game1 : Game
                 NodeKind.Start => NodeKind.End,
                 _ => NodeKind.Normal
             };
+            node.RadiusUnits = node.Kind is NodeKind.Start or NodeKind.End
+                ? DiagramNode.TerminalRadiusUnits
+                : DiagramNode.DefaultRadiusUnits;
         });
 
         _status = node.Kind switch
@@ -2090,6 +2093,7 @@ public sealed class DiagramNode
 {
     public const float RadiusUnit = 20f;
     public const int DefaultRadiusUnits = 3;
+    public const int TerminalRadiusUnits = 2;
     public const int MinRadiusUnits = 1;
     public const int MaxRadiusUnits = 12;
     private int _radiusUnits = DefaultRadiusUnits;

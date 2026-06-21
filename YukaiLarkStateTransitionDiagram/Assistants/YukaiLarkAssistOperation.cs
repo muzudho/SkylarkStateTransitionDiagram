@@ -54,7 +54,7 @@ internal static class YukaiLarkAssistOperations
                 Id = nextNodeId++,
                 Label = "開始",
                 Position = operation.SnapToHalfGrid(worldPosition),
-                RadiusUnits = DiagramNode.DefaultRadiusUnits,
+                RadiusUnits = DiagramNode.TerminalRadiusUnits,
                 ColorIndex = 0,
                 Kind = NodeKind.Start
             };
@@ -83,7 +83,7 @@ internal static class YukaiLarkAssistOperations
                 Id = nextNodeId++,
                 Label = "終了",
                 Position = operation.SnapToHalfGrid(worldPosition),
-                RadiusUnits = DiagramNode.DefaultRadiusUnits,
+                RadiusUnits = DiagramNode.TerminalRadiusUnits,
                 ColorIndex = 0,
                 Kind = NodeKind.End
             };
