@@ -38,17 +38,17 @@ public sealed class HeaderRenderer : IDisposable
     /// <param name="viewport">描画領域のビューポート</param>
     /// <param name="title">表示タイトル</param>
     /// <param name="status">現在の状態メッセージ</param>
-    public void DrawHeader(Viewport viewport, string title, string status)
+    public void DrawHeader(Viewport viewport, string title, string status, BoardTheme theme)
     {
         var bounds = new Rectangle(0, 0, viewport.Width, 58);
-        _spriteBatch.Draw(_pixel, bounds, new Color(17, 19, 23, 238));
-        _spriteBatch.Draw(_pixel, new Rectangle(0, bounds.Height - 1, viewport.Width, 1), new Color(65, 72, 84));
+        _spriteBatch.Draw(_pixel, bounds, theme.HeaderBackgroundColor);
+        _spriteBatch.Draw(_pixel, new Rectangle(0, bounds.Height - 1, viewport.Width, 1), theme.HeaderBorderColor);
 
         // タイトルの描画
-        DrawUiText(title, new Vector2(12, 8), new Color(245, 247, 250), 18, true);
+        DrawUiText(title, new Vector2(12, 8), theme.HeaderTitleTextColor, 18, true);
 
         // 状態メッセージの描画
-        DrawUiText(status, new Vector2(12, 32), new Color(210, 220, 232), 16, false);
+        DrawUiText(status, new Vector2(12, 32), theme.HeaderStatusTextColor, 16, false);
     }
 
     /// <summary>

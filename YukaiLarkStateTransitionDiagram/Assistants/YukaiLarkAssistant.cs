@@ -1,6 +1,7 @@
 namespace YukaiLarkStateTransitionDiagram.Assistants;
 
 using System;
+using YukaiLarkStateTransitionDiagram;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
@@ -88,6 +89,7 @@ internal sealed class YukaiLarkAssistant
         Viewport viewport,
         TimeSpan totalGameTime,
         YukaiLarkAssistantContext context,
+        BoardTheme theme,
         DrawRectangleOutline drawRectangleOutline,
         DrawUiText drawUiText)
     {
@@ -109,11 +111,11 @@ internal sealed class YukaiLarkAssistant
 
         if (_completedKind != YukaiLarkAssistKind.None && _completedAssistSeconds > 0)
         {
-            DrawCompletedAssistBubble(spriteBatch, pixel, target, _completedKind, drawRectangleOutline, drawUiText);
+            DrawCompletedAssistBubble(spriteBatch, pixel, target, _completedKind, theme, drawRectangleOutline, drawUiText);
         }
         else if (IsAssistReady && assistKind != YukaiLarkAssistKind.None)
         {
-            DrawAssistBubble(spriteBatch, pixel, target, assistKind, drawRectangleOutline, drawUiText);
+            DrawAssistBubble(spriteBatch, pixel, target, assistKind, theme, drawRectangleOutline, drawUiText);
         }
     }
 
@@ -165,6 +167,7 @@ internal sealed class YukaiLarkAssistant
         Texture2D pixel,
         Rectangle mascotBounds,
         YukaiLarkAssistKind kind,
+        BoardTheme theme,
         DrawRectangleOutline drawRectangleOutline,
         DrawUiText drawUiText)
     {
@@ -172,10 +175,10 @@ internal sealed class YukaiLarkAssistant
         const int bubbleHeight = 72;
         var bubble = new Rectangle(mascotBounds.X - bubbleWidth + 18, mascotBounds.Y + 22, bubbleWidth, bubbleHeight);
         var (title, body) = GetBubbleText(kind);
-        spriteBatch.Draw(pixel, bubble, new Color(255, 253, 239, 235));
-        drawRectangleOutline(bubble, new Color(83, 178, 176, 210), 2);
-        drawUiText(title, new Vector2(bubble.X + 12, bubble.Y + 10), new Color(58, 45, 34), 17, true);
-        drawUiText(body, new Vector2(bubble.X + 12, bubble.Y + 38), new Color(74, 86, 92), 15, false);
+        spriteBatch.Draw(pixel, bubble, theme.AssistantBubbleColor);
+        drawRectangleOutline(bubble, theme.AssistantBubbleBorderColor, 2);
+        drawUiText(title, new Vector2(bubble.X + 12, bubble.Y + 10), theme.AssistantTitleTextColor, 17, true);
+        drawUiText(body, new Vector2(bubble.X + 12, bubble.Y + 38), theme.AssistantBodyTextColor, 15, false);
     }
 
     private static (string Title, string Body) GetBubbleText(YukaiLarkAssistKind kind)
@@ -192,6 +195,7 @@ internal sealed class YukaiLarkAssistant
         Texture2D pixel,
         Rectangle mascotBounds,
         YukaiLarkAssistKind kind,
+        BoardTheme theme,
         DrawRectangleOutline drawRectangleOutline,
         DrawUiText drawUiText)
     {
@@ -199,11 +203,11 @@ internal sealed class YukaiLarkAssistant
         const int bubbleHeight = 104;
         var bubble = new Rectangle(mascotBounds.X - bubbleWidth + 18, mascotBounds.Y + 18, bubbleWidth, bubbleHeight);
         var (title, action, hint) = GetCompletedBubbleText(kind);
-        spriteBatch.Draw(pixel, bubble, new Color(255, 253, 239, 240));
-        drawRectangleOutline(bubble, new Color(233, 188, 96, 230), 2);
-        drawUiText(title, new Vector2(bubble.X + 12, bubble.Y + 10), new Color(58, 45, 34), 17, true);
-        drawUiText(action, new Vector2(bubble.X + 12, bubble.Y + 38), new Color(67, 75, 82), 15, false);
-        drawUiText(hint, new Vector2(bubble.X + 12, bubble.Y + 66), new Color(83, 112, 116), 14, false);
+        spriteBatch.Draw(pixel, bubble, theme.AssistantBubbleColor);
+        drawRectangleOutline(bubble, theme.AssistantCompletedBubbleBorderColor, 2);
+        drawUiText(title, new Vector2(bubble.X + 12, bubble.Y + 10), theme.AssistantTitleTextColor, 17, true);
+        drawUiText(action, new Vector2(bubble.X + 12, bubble.Y + 38), theme.AssistantBodyTextColor, 15, false);
+        drawUiText(hint, new Vector2(bubble.X + 12, bubble.Y + 66), theme.AssistantHintTextColor, 14, false);
     }
 
     private static (string Title, string Action, string Hint) GetCompletedBubbleText(YukaiLarkAssistKind kind)

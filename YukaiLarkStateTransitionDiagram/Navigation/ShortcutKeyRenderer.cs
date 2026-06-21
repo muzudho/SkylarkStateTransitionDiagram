@@ -1,6 +1,7 @@
 namespace YukaiLarkStateTransitionDiagram.Navigation;
 
 using System;
+using YukaiLarkStateTransitionDiagram;
 using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -18,22 +19,30 @@ public sealed class ShortcutKeyRenderer : IDisposable
     private readonly Texture2D _pixel;
     private readonly Dictionary<string, Texture2D> _uiTextTextureCache = new();
     private IKeyCapTheme _keyCapTheme;
+    private BoardTheme _boardTheme;
 
     private readonly record struct HelpHint(string Key, string Description);
     private readonly record struct HelpPage(HelpHint[] Hints);
 
-    public ShortcutKeyRenderer(GraphicsDevice graphicsDevice, SpriteBatch spriteBatch, Texture2D pixel, IKeyCapTheme keyCapTheme)
+    public ShortcutKeyRenderer(GraphicsDevice graphicsDevice, SpriteBatch spriteBatch, Texture2D pixel, IKeyCapTheme keyCapTheme, BoardTheme boardTheme)
     {
         _graphicsDevice = graphicsDevice;
         _spriteBatch = spriteBatch;
         _pixel = pixel;
         _keyCapTheme = keyCapTheme;
+        _boardTheme = boardTheme;
     }
 
     public IKeyCapTheme KeyCapTheme
     {
         get => _keyCapTheme;
         set => _keyCapTheme = value;
+    }
+
+    public BoardTheme BoardTheme
+    {
+        get => _boardTheme;
+        set => _boardTheme = value;
     }
 
     public void Dispose()
@@ -71,7 +80,7 @@ public sealed class ShortcutKeyRenderer : IDisposable
         }
 
         var y = viewport.Height - 34;
-        _spriteBatch.Draw(_pixel, new Rectangle(0, y, viewport.Width, 34), new Color(17, 19, 23, 210));
+        _spriteBatch.Draw(_pixel, new Rectangle(0, y, viewport.Width, 34), _boardTheme.BottomBarBackgroundColor);
 
         var pages = GetHelpPages(isEditingLabel, isExportSelecting, hasExportSelection, selectedNode, selectedTransition);
         if (pages.Length == 0)

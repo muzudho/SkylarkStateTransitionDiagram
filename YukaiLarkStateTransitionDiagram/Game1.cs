@@ -129,7 +129,7 @@ public class Game1 : Game
         _primitiveRenderer = new PrimitiveRenderer(_spriteBatch, _pixel);
         _edgeRenderer = new EdgeRenderer(_primitiveRenderer, _spriteBatch, GetLabelTexture, _boardTheme);
         _headerRenderer = new HeaderRenderer(GraphicsDevice, _spriteBatch, _pixel);
-        _shortcutKeyRenderer = new ShortcutKeyRenderer(GraphicsDevice, _spriteBatch, _pixel, _keyCapTheme);
+        _shortcutKeyRenderer = new ShortcutKeyRenderer(GraphicsDevice, _spriteBatch, _pixel, _keyCapTheme, _boardTheme);
         _nodeRenderer = new NodeRenderer(_primitiveRenderer, _spriteBatch, Palette, GetLabelTexture);
         _yukaiLarkMascotTexture = LoadTextureWithTransparentWhite(YukaiLarkMascotTexturePath);
     }
@@ -172,7 +172,7 @@ public class Game1 : Game
         DrawDiagramScene(GetViewMatrix(), includeInteraction: true);
 
         _spriteBatch.Begin(samplerState: SamplerState.LinearClamp);
-        _headerRenderer.DrawHeader(GraphicsDevice.Viewport, GetHeaderTitle(), _status);
+        _headerRenderer.DrawHeader(GraphicsDevice.Viewport, GetHeaderTitle(), _status, _boardTheme);
 
         // ［開始ノード作成アシスト］の描画
         DrawYukaiLarkMascot(GraphicsDevice.Viewport, gameTime.TotalGameTime);
@@ -521,6 +521,7 @@ public class Game1 : Game
         _boardTheme = BoardThemes.ForKeyCapTheme(_keyCapTheme);
         _edgeRenderer.Theme = _boardTheme;
         _shortcutKeyRenderer.KeyCapTheme = _keyCapTheme;
+        _shortcutKeyRenderer.BoardTheme = _boardTheme;
         _status = $"テーマを {themeIndex}: {_keyCapTheme.Name} に切り替えました。背景とPNG出力にも反映します。";
     }
 
@@ -1856,6 +1857,7 @@ public class Game1 : Game
             viewport,
             totalGameTime,
             CreateAssistantContext(),
+            _boardTheme,
             DrawScreenRectangleOutline,
             DrawUiText);
     }
@@ -1871,13 +1873,13 @@ public class Game1 : Game
         const int panelWidth = 290;
         var x = width - panelWidth - 12;
         var bounds = new Rectangle(x, 70, panelWidth, 96);
-        _spriteBatch.Draw(_pixel, bounds, new Color(22, 25, 31, 218));
-        _spriteBatch.Draw(_pixel, new Rectangle(bounds.X, bounds.Y, bounds.Width, 1), new Color(82, 92, 108));
-        _spriteBatch.Draw(_pixel, new Rectangle(bounds.X, bounds.Bottom - 1, bounds.Width, 1), new Color(8, 10, 14));
+        _spriteBatch.Draw(_pixel, bounds, _boardTheme.PanelBackgroundColor);
+        _spriteBatch.Draw(_pixel, new Rectangle(bounds.X, bounds.Y, bounds.Width, 1), _boardTheme.PanelTopEdgeColor);
+        _spriteBatch.Draw(_pixel, new Rectangle(bounds.X, bounds.Bottom - 1, bounds.Width, 1), _boardTheme.PanelBottomEdgeColor);
 
-        DrawUiText($"状態: {_nodes.Count}    遷移: {_transitions.Count}", new Vector2(x + 12, bounds.Y + 10), new Color(236, 240, 245), 16, true);
-        DrawUiText(GetSelectionSummary(), new Vector2(x + 12, bounds.Y + 36), new Color(196, 210, 226), 15, false);
-        DrawUiText(GetFileSummary(), new Vector2(x + 12, bounds.Y + 62), new Color(170, 184, 202), 14, false);
+        DrawUiText($"状態: {_nodes.Count}    遷移: {_transitions.Count}", new Vector2(x + 12, bounds.Y + 10), _boardTheme.PanelPrimaryTextColor, 16, true);
+        DrawUiText(GetSelectionSummary(), new Vector2(x + 12, bounds.Y + 36), _boardTheme.PanelSecondaryTextColor, 15, false);
+        DrawUiText(GetFileSummary(), new Vector2(x + 12, bounds.Y + 62), _boardTheme.PanelMutedTextColor, 14, false);
     }
 
     private string GetSelectionSummary()
@@ -2127,7 +2129,57 @@ public sealed record BoardTheme(
     Color SelectedTransitionLabelColor,
     Color TransitionHandleColor,
     Color TransitionControlHandleColor,
-    Color TransitionGuideColor);
+    Color TransitionGuideColor)
+{
+    private bool IsLightBackground => GetLuminance(BackgroundColor) >= 0.58f;
+
+    public Color HeaderBackgroundColor => IsLightBackground
+        ? WithAlpha(PhotoPaperColor, 238)
+        : WithAlpha(Blend(BackgroundColor, Color.Black, 0.18f), 238);
+    public Color HeaderBorderColor => WithAlpha(IsLightBackground ? PhotoEdgeColor : GridColor, 220);
+    public Color HeaderTitleTextColor => IsLightBackground ? TransitionLabelColor : PhotoPaperColor;
+    public Color HeaderStatusTextColor => IsLightBackground
+        ? Blend(TransitionLabelColor, BackgroundColor, 0.18f)
+        : TransitionLabelColor;
+
+    public Color PanelBackgroundColor => IsLightBackground
+        ? WithAlpha(PhotoPaperColor, 226)
+        : WithAlpha(Blend(BackgroundColor, Color.Black, 0.10f), 224);
+    public Color PanelTopEdgeColor => WithAlpha(IsLightBackground ? PinColor : GridColor, 210);
+    public Color PanelBottomEdgeColor => WithAlpha(Blend(BackgroundColor, Color.Black, 0.36f), 220);
+    public Color PanelPrimaryTextColor => HeaderTitleTextColor;
+    public Color PanelSecondaryTextColor => HeaderStatusTextColor;
+    public Color PanelMutedTextColor => IsLightBackground
+        ? Blend(TransitionLabelColor, BackgroundColor, 0.34f)
+        : Blend(TransitionLabelColor, BackgroundColor, 0.18f);
+
+    public Color BottomBarBackgroundColor => IsLightBackground
+        ? WithAlpha(PhotoPaperColor, 220)
+        : WithAlpha(Blend(BackgroundColor, Color.Black, 0.14f), 218);
+
+    public Color AssistantBubbleColor => WithAlpha(PhotoPaperColor, 236);
+    public Color AssistantBubbleBorderColor => WithAlpha(PinColor, 220);
+    public Color AssistantCompletedBubbleBorderColor => WithAlpha(PhotoEdgeColor, 230);
+    public Color AssistantTitleTextColor => IsLightBackground ? TransitionLabelColor : Blend(TransitionLabelColor, Color.Black, 0.12f);
+    public Color AssistantBodyTextColor => IsLightBackground ? PanelSecondaryTextColor : Blend(TransitionLabelColor, BackgroundColor, 0.16f);
+    public Color AssistantHintTextColor => IsLightBackground ? PanelMutedTextColor : Blend(TransitionLabelColor, BackgroundColor, 0.25f);
+
+    private static float GetLuminance(Color color)
+        => ((0.2126f * color.R) + (0.7152f * color.G) + (0.0722f * color.B)) / 255f;
+
+    private static Color WithAlpha(Color color, byte alpha)
+        => new(color.R, color.G, color.B, alpha);
+
+    private static Color Blend(Color from, Color to, float amount)
+    {
+        var clamped = MathHelper.Clamp(amount, 0f, 1f);
+        return new Color(
+            (byte)MathF.Round(MathHelper.Lerp(from.R, to.R, clamped)),
+            (byte)MathF.Round(MathHelper.Lerp(from.G, to.G, clamped)),
+            (byte)MathF.Round(MathHelper.Lerp(from.B, to.B, clamped)),
+            (byte)MathF.Round(MathHelper.Lerp(from.A, to.A, clamped)));
+    }
+}
 
 public static class BoardThemes
 {
