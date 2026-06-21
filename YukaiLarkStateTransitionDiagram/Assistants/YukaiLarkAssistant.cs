@@ -192,7 +192,7 @@ internal sealed class YukaiLarkAssistant
     private static string GetStatusText(YukaiLarkAssistantContext context, YukaiLarkAssistKind kind)
         => kind switch
         {
-            YukaiLarkAssistKind.CreateStartNode => "ユカイラーク: まず開始ノードを作れます。Enterか鳥をクリック。",
+            YukaiLarkAssistKind.CreateStartNode => "ユカイラーク: わたしの名前はユカイラークです。開始ノードを作れます。",
             YukaiLarkAssistKind.CreateStateNode => "ユカイラーク: 次の状態ノードを作れます。Enterか鳥をクリック。",
             YukaiLarkAssistKind.CreateTransition => "ユカイラーク: 開始から次の状態へ遷移を作れます。Enterか鳥をクリック。",
             YukaiLarkAssistKind.AddTransitionEvent => $"ユカイラーク: {context.MissingTransitionEventSummary} 間の遷移にイベントがありません。Enterか鳥をクリック。",
@@ -223,7 +223,7 @@ internal sealed class YukaiLarkAssistant
     private static (string Title, string Body) GetBubbleText(YukaiLarkAssistKind kind, YukaiLarkAssistantContext context)
         => kind switch
         {
-            YukaiLarkAssistKind.CreateStartNode => ("開始ノードを作る？", "Enter または鳥をクリック"),
+            YukaiLarkAssistKind.CreateStartNode => ("わたしの名前はユカイラークです", "開始ノードを作る？ Enter または鳥をクリック"),
             YukaiLarkAssistKind.CreateStateNode => ("次の状態を作る？", "Enter または鳥をクリック"),
             YukaiLarkAssistKind.CreateTransition => ("遷移をつなぐ？", "Enter または鳥をクリック"),
             YukaiLarkAssistKind.AddTransitionEvent => ("イベントを追加する？", $"{context.MissingTransitionEventSummary} 間の遷移"),
