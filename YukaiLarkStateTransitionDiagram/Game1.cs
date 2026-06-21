@@ -154,7 +154,7 @@ public class Game1 : Game
         GraphicsDevice.Clear(_boardTheme.BackgroundColor);
         DrawDiagramScene(GetViewMatrix(), includeInteraction: true);
 
-        _spriteBatch.Begin(samplerState: SamplerState.PointClamp);
+        _spriteBatch.Begin(samplerState: SamplerState.LinearClamp);
         DrawToolbar();
         DrawInspectorPanel();
         DrawBottomHelp();
@@ -586,7 +586,7 @@ public class Game1 : Game
         GraphicsDevice.SetRenderTarget(renderTarget);
         GraphicsDevice.Clear(_boardTheme.ExportBackdropColor);
 
-        _spriteBatch.Begin(samplerState: SamplerState.PointClamp);
+        _spriteBatch.Begin(samplerState: SamplerState.LinearClamp);
         DrawExportPhotoFrame(new Rectangle(0, 0, imageWidth, imageHeight), imageArea, fillBackdrop: true, fillImageArea: true);
         _spriteBatch.End();
 
@@ -596,13 +596,13 @@ public class Game1 : Game
         var previousScissor = GraphicsDevice.ScissorRectangle;
         using var scissorRasterizer = new RasterizerState { ScissorTestEnable = true };
         GraphicsDevice.ScissorRectangle = imageArea;
-        _spriteBatch.Begin(samplerState: SamplerState.PointClamp, rasterizerState: scissorRasterizer, transformMatrix: exportTransform);
+        _spriteBatch.Begin(samplerState: SamplerState.LinearClamp, rasterizerState: scissorRasterizer, transformMatrix: exportTransform);
         DrawGrid(40, _boardTheme.GridColor, worldTopLeft, worldBottomRight);
         DrawDiagramContent(includeInteraction: false);
         _spriteBatch.End();
         GraphicsDevice.ScissorRectangle = previousScissor;
 
-        _spriteBatch.Begin(samplerState: SamplerState.PointClamp);
+        _spriteBatch.Begin(samplerState: SamplerState.LinearClamp);
         DrawExportPhotoTop(imageArea);
         _spriteBatch.End();
 
@@ -1332,7 +1332,7 @@ public class Game1 : Game
 
     private void DrawDiagramScene(Matrix transformMatrix, bool includeInteraction)
     {
-        _spriteBatch.Begin(samplerState: SamplerState.PointClamp, transformMatrix: transformMatrix);
+        _spriteBatch.Begin(samplerState: SamplerState.LinearClamp, transformMatrix: transformMatrix);
         DrawGrid(40, _boardTheme.GridColor);
         DrawDiagramContent(includeInteraction);
         _spriteBatch.End();

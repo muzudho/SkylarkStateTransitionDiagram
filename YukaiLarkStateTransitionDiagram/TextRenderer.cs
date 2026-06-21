@@ -141,7 +141,12 @@ public static class TextRenderer
             for (var x = 0; x < width; x++)
             {
                 var pixel = bitmap.GetPixel(x, y);
-                colors[y * width + x] = new Color(pixel.R, pixel.G, pixel.B, pixel.A);
+                var alpha = pixel.A;
+                colors[y * width + x] = new Color(
+                    Premultiply(pixel.R, alpha),
+                    Premultiply(pixel.G, alpha),
+                    Premultiply(pixel.B, alpha),
+                    alpha);
             }
         }
 
@@ -149,4 +154,13 @@ public static class TextRenderer
         texture.SetData(colors);
         return texture;
     }
+
+    /// <summary>
+    /// 色成分をアルファ値でプリマルチプライする。
+    /// </summary>
+    /// <param name="color">色成分</param>
+    /// <param name="alpha">アルファ値</param>
+    /// <returns>プリマルチプライ後の色成分</returns>
+    private static byte Premultiply(byte color, byte alpha)
+        => (byte)((color * alpha + 127) / 255);
 }
