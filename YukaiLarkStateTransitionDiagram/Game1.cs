@@ -1136,6 +1136,7 @@ public class Game1 : Game
             _selectedTransition = null;
         });
         _yukaiLarkAssistant.Reset();
+        _yukaiLarkAssistant.NotifyAssistCompleted(YukaiLarkAssistKind.CreateStartNode);
         _status = "開始ノードを作成しました。次はNで状態追加、Shift+ドラッグで遷移作成。";
     }
     private void CreateStateNodeWithAssist()
@@ -1158,6 +1159,7 @@ public class Game1 : Game
             _selectedTransition = null;
         });
         _yukaiLarkAssistant.Reset();
+        _yukaiLarkAssistant.NotifyAssistCompleted(YukaiLarkAssistKind.CreateStateNode);
         _status = "状態ノードを作成しました。次は開始ノードから遷移をつなげます。";
     }
 
@@ -1178,6 +1180,7 @@ public class Game1 : Game
             _selectedNode = null;
             _selectedTransition = _transitions.LastOrDefault();
             _yukaiLarkAssistant.Reset();
+            _yukaiLarkAssistant.NotifyAssistCompleted(YukaiLarkAssistKind.CreateTransition);
             _status = "開始から次の状態へ遷移を作成しました。F2・Enterでラベル編集できます。";
         }
     }
@@ -2279,6 +2282,4 @@ public static class PrimitiveText
         }
     }
 }
-
-
 

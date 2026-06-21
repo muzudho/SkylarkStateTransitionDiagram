@@ -8,10 +8,13 @@ using Microsoft.Xna.Framework.Input;
 internal sealed class YukaiLarkAssistant
 {
     private const double AssistWakeSeconds = 1.2;
+    private const double CompletedAssistDisplaySeconds = 5.0;
     private const int MascotTargetWidth = 176;
 
     private double _assistSeconds;
+    private double _completedAssistSeconds;
     private YukaiLarkAssistKind _activeKind;
+    private YukaiLarkAssistKind _completedKind;
 
     public Rectangle MascotBounds { get; private set; }
 
@@ -19,6 +22,15 @@ internal sealed class YukaiLarkAssistant
 
     public string Update(GameTime gameTime, YukaiLarkAssistantContext context, string currentStatus, string defaultStatus)
     {
+        if (_completedAssistSeconds > 0)
+        {
+            _completedAssistSeconds = Math.Max(0, _completedAssistSeconds - gameTime.ElapsedGameTime.TotalSeconds);
+            if (_completedAssistSeconds <= 0)
+            {
+                _completedKind = YukaiLarkAssistKind.None;
+            }
+        }
+
         var nextKind = GetAssistKind(context);
         if (nextKind == YukaiLarkAssistKind.None)
         {
@@ -57,6 +69,12 @@ internal sealed class YukaiLarkAssistant
             ? new Vector2(viewport.Width * 0.58f, viewport.Height * 0.45f)
             : new Vector2(viewport.Width * 0.42f, viewport.Height * 0.45f);
 
+    public void NotifyAssistCompleted(YukaiLarkAssistKind kind)
+    {
+        _completedKind = kind;
+        _completedAssistSeconds = CompletedAssistDisplaySeconds;
+    }
+
     public void Reset()
     {
         _assistSeconds = 0;
@@ -89,7 +107,11 @@ internal sealed class YukaiLarkAssistant
         MascotBounds = target;
         spriteBatch.Draw(mascotTexture, target, source, Color.White * 0.92f);
 
-        if (IsAssistReady && assistKind != YukaiLarkAssistKind.None)
+        if (_completedKind != YukaiLarkAssistKind.None && _completedAssistSeconds > 0)
+        {
+            DrawCompletedAssistBubble(spriteBatch, pixel, target, _completedKind, drawRectangleOutline, drawUiText);
+        }
+        else if (IsAssistReady && assistKind != YukaiLarkAssistKind.None)
         {
             DrawAssistBubble(spriteBatch, pixel, target, assistKind, drawRectangleOutline, drawUiText);
         }
@@ -163,6 +185,34 @@ internal sealed class YukaiLarkAssistant
             YukaiLarkAssistKind.CreateStateNode => ("次の状態を作る？", "Enter または鳥をクリック"),
             YukaiLarkAssistKind.CreateTransition => ("遷移をつなぐ？", "Enter または鳥をクリック"),
             _ => (string.Empty, string.Empty)
+        };
+
+    private static void DrawCompletedAssistBubble(
+        SpriteBatch spriteBatch,
+        Texture2D pixel,
+        Rectangle mascotBounds,
+        YukaiLarkAssistKind kind,
+        DrawRectangleOutline drawRectangleOutline,
+        DrawUiText drawUiText)
+    {
+        const int bubbleWidth = 410;
+        const int bubbleHeight = 104;
+        var bubble = new Rectangle(mascotBounds.X - bubbleWidth + 18, mascotBounds.Y + 18, bubbleWidth, bubbleHeight);
+        var (title, action, hint) = GetCompletedBubbleText(kind);
+        spriteBatch.Draw(pixel, bubble, new Color(255, 253, 239, 240));
+        drawRectangleOutline(bubble, new Color(233, 188, 96, 230), 2);
+        drawUiText(title, new Vector2(bubble.X + 12, bubble.Y + 10), new Color(58, 45, 34), 17, true);
+        drawUiText(action, new Vector2(bubble.X + 12, bubble.Y + 38), new Color(67, 75, 82), 15, false);
+        drawUiText(hint, new Vector2(bubble.X + 12, bubble.Y + 66), new Color(83, 112, 116), 14, false);
+    }
+
+    private static (string Title, string Action, string Hint) GetCompletedBubbleText(YukaiLarkAssistKind kind)
+        => kind switch
+        {
+            YukaiLarkAssistKind.CreateStartNode => ("ユカイラークが作図しました", "開始ノードを追加し、開始種別にして選択しました。", "手動なら Nで状態追加、Tで種別変更です。"),
+            YukaiLarkAssistKind.CreateStateNode => ("ユカイラークが作図しました", "次の状態ノードを追加し、選択しました。", "手動なら Nで状態追加、ドラッグで位置調整です。"),
+            YukaiLarkAssistKind.CreateTransition => ("ユカイラークが作図しました", "開始ノードから次の状態へ遷移を作成しました。", "手動なら Shift+ドラッグで状態同士を接続します。"),
+            _ => (string.Empty, string.Empty, string.Empty)
         };
 }
 
