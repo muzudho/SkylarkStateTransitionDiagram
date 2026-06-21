@@ -1271,7 +1271,8 @@ public class Game1 : Game
                 _transitions.Clear();
             }
         }
-        CreateSample(trackHistory: false);
+        ClearDiagram();
+        ClearHistory();
     }
 
     /// <summary>
