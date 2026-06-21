@@ -47,18 +47,16 @@ public sealed class NodeRenderer
         {
             _primitiveRenderer.DrawCircleOutline(node.Position, node.Radius, new Color(15, 18, 24), 3f);
         }
-        // 開始ノード、終了ノード
+        // 開始ノード
+        else if (node.Kind == NodeKind.Start)
+        {
+            _primitiveRenderer.DrawCircleOutline(node.Position, node.Radius - 1f, Color.White, 5f);
+        }
+        // 終了ノード
         else
         {
-            if (node.Kind == NodeKind.Start)
-            {
-                _primitiveRenderer.DrawCircleOutline(node.Position, node.Radius, Color.White, 6f);
-            }
-            else
-            {
-                _primitiveRenderer.DrawCircleOutline(node.Position, node.Radius, Color.White, 2f);
-                _primitiveRenderer.DrawCircleOutline(node.Position, node.Radius - 10f, Color.White, 2f);
-            }
+            _primitiveRenderer.DrawCircleOutline(node.Position, node.Radius - 2f, Color.White, 2f);
+            _primitiveRenderer.DrawCircleOutline(node.Position, node.Radius - 7f, Color.White, 2f);
         }
 
         var label = node == editingNode ? editingLabel + "_" : node.Label;
