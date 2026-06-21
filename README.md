@@ -10,7 +10,7 @@
 <img src="YukaiLarkStateTransitionDiagram/Assets\BrandLogo/yukai-lark-app-icon.png" alt="ユカイラーク" width="96"></img>  
 👆　ユカイラークという鳥のアシスタントが、ツールの使い方を説明します。  
 
-![サンプル状態遷移図の画面例](YukaiLarkStateTransitionDiagram/Docs/images/screenshot-sample.png)  
+![サンプル状態遷移図の画面例](YukaiLarkStateTransitionDiagram/Assets/Screenshots/スクリーンショット%202026-06-21%20225846.png)  
 
 ## できること
 
@@ -51,12 +51,6 @@ Visual Studio から起動する場合は、`YukaiLarkStateTransitionDiagram.sln
 | PNG画像として出力 | `Ctrl + P` |
 
 詳しい操作は [使い方説明書](YukaiLarkStateTransitionDiagram/Docs/使い方説明書.md) を見てください。
-
-## ユカイラークについて
-
-画面に出てくる鳥の名前は「ユカイラーク」です。
-
-ユカイラークは、図が空のときは開始ノード、状態が足りないときは次の状態、遷移が足りないときは矢印、といったように、今の図に合わせて作図を手伝います。吹き出しが出ているときに `Enter` を押すか、ユカイラークをクリックすると、提案された部品を追加できます。
 
 ## 必要なもの
 
