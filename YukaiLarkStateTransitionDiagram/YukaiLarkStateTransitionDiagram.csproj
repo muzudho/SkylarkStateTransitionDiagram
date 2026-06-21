@@ -28,6 +28,11 @@
     <FrameworkReference Include="Microsoft.WindowsDesktop.App" />
   </ItemGroup>
   <ItemGroup>
+    <None Update="Assets\BrandLogo\yukai-lark-logo.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.*" />
     <PackageReference Include="MonoGame.Content.Builder.Task" Version="3.8.*" />
   </ItemGroup>

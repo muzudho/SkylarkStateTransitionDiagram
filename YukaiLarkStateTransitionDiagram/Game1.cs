@@ -24,6 +24,7 @@ public class Game1 : Game
     private const int ExportPhotoPaperTopPadding = 18;
     private const int ExportPhotoPaperBottomPadding = 54;
     private const int ExportPhotoOuterBottomPadding = 10;
+    private const string YukaiLarkMascotTexturePath = "Assets/BrandLogo/yukai-lark-logo.png";
     private static readonly Keys[] ThemeDigitKeys =
     [
         Keys.D0,
@@ -66,6 +67,7 @@ public class Game1 : Game
     private BoardTheme _boardTheme = BoardThemes.ForKeyCapTheme(KeyCapThemes.Current);
     private SpriteBatch _spriteBatch = null!;
     private Texture2D _pixel = null!;
+    private Texture2D? _yukaiLarkMascotTexture;
     private MouseState _previousMouse;
     private KeyboardState _previousKeyboard;
     private DiagramNode? _selectedNode;
@@ -125,6 +127,7 @@ public class Game1 : Game
         _headerRenderer = new HeaderRenderer(GraphicsDevice, _spriteBatch, _pixel);
         _shortcutKeyRenderer = new ShortcutKeyRenderer(GraphicsDevice, _spriteBatch, _pixel, _keyCapTheme);
         _nodeRenderer = new NodeRenderer(_primitiveRenderer, _spriteBatch, Palette, GetLabelTexture);
+        _yukaiLarkMascotTexture = LoadTextureWithTransparentWhite(YukaiLarkMascotTexturePath);
     }
     protected override void Update(GameTime gameTime)
     {
@@ -162,6 +165,7 @@ public class Game1 : Game
 
         _spriteBatch.Begin(samplerState: SamplerState.LinearClamp);
         _headerRenderer.DrawHeader(GraphicsDevice.Viewport, GetHeaderTitle(), _status);
+        DrawYukaiLarkMascot(GraphicsDevice.Viewport);
         DrawInspectorPanel();
         _shortcutKeyRenderer.DrawBottomHelp(
             GraphicsDevice.Viewport,
@@ -187,6 +191,8 @@ public class Game1 : Game
             texture.Dispose();
         }
         _uiTextTextureCache.Clear();
+        _yukaiLarkMascotTexture?.Dispose();
+        _yukaiLarkMascotTexture = null;
         _headerRenderer?.Dispose();
         _shortcutKeyRenderer?.Dispose();
         base.UnloadContent();
@@ -1776,6 +1782,52 @@ public class Game1 : Game
         _spriteBatch.Draw(_pixel, new Rectangle(rectangle.X, rectangle.Bottom - thickness, rectangle.Width, thickness), color);
         _spriteBatch.Draw(_pixel, new Rectangle(rectangle.X, rectangle.Y, thickness, rectangle.Height), color);
         _spriteBatch.Draw(_pixel, new Rectangle(rectangle.Right - thickness, rectangle.Y, thickness, rectangle.Height), color);
+    }
+    private Texture2D? LoadTextureWithTransparentWhite(string relativePath)
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, relativePath);
+        if (!File.Exists(path))
+        {
+            path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", relativePath);
+        }
+        if (!File.Exists(path))
+        {
+            _status = "ユカイラーク画像が見つかりません。";
+            return null;
+        }
+
+        using var stream = File.OpenRead(path);
+        var texture = Texture2D.FromStream(GraphicsDevice, stream);
+        var pixels = new Color[texture.Width * texture.Height];
+        texture.GetData(pixels);
+        for (var i = 0; i < pixels.Length; i++)
+        {
+            var pixel = pixels[i];
+            if (pixel.R > 245 && pixel.G > 245 && pixel.B > 245)
+            {
+                pixels[i] = Color.Transparent;
+            }
+            else if (pixel.R > 232 && pixel.G > 232 && pixel.B > 232)
+            {
+                pixels[i] = new Color(pixel.R, pixel.G, pixel.B, (byte)80);
+            }
+        }
+        texture.SetData(pixels);
+        return texture;
+    }
+
+    private void DrawYukaiLarkMascot(Viewport viewport)
+    {
+        if (_yukaiLarkMascotTexture is null || viewport.Width < 640 || viewport.Height < 420)
+        {
+            return;
+        }
+
+        var source = new Rectangle(0, 0, _yukaiLarkMascotTexture.Width, (int)(_yukaiLarkMascotTexture.Height * 0.66f));
+        const int targetWidth = 176;
+        var targetHeight = (int)MathF.Round(targetWidth * source.Height / (float)source.Width);
+        var target = new Rectangle(viewport.Width - targetWidth - 22, 178, targetWidth, targetHeight);
+        _spriteBatch.Draw(_yukaiLarkMascotTexture, target, source, Color.White * 0.92f);
     }
     private void DrawInspectorPanel()
     {
