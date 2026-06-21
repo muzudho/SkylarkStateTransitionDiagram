@@ -1281,7 +1281,7 @@ public class Game1 : Game
     {
         ExecuteUndoableChange(ClearDiagram);
         _currentFilePath = null;
-        SaveDiagramAs();
+        _status = "空の状態遷移図を新規作成しました。Ctrl+Sで保存先を指定できます。";
     }
 
     /// <summary>
