@@ -62,6 +62,7 @@ public class Game1 : Game
     private EdgeRenderer _edgeRenderer = null!;
     private NodeRenderer _nodeRenderer = null!;
     private HeaderRenderer _headerRenderer = null!;
+    private PropertyWindowRenderer _propertyWindowRenderer = null!;
     private ShortcutKeyRenderer _shortcutKeyRenderer = null!;
     private IKeyCapTheme _keyCapTheme = KeyCapThemes.Current;
     private BoardTheme _boardTheme = BoardThemes.ForKeyCapTheme(KeyCapThemes.Current);
@@ -129,6 +130,7 @@ public class Game1 : Game
         _primitiveRenderer = new PrimitiveRenderer(_spriteBatch, _pixel);
         _edgeRenderer = new EdgeRenderer(_primitiveRenderer, _spriteBatch, GetLabelTexture, _boardTheme);
         _headerRenderer = new HeaderRenderer(GraphicsDevice, _spriteBatch, _pixel);
+        _propertyWindowRenderer = new PropertyWindowRenderer(GraphicsDevice, _spriteBatch, _pixel);
         _shortcutKeyRenderer = new ShortcutKeyRenderer(GraphicsDevice, _spriteBatch, _pixel, _keyCapTheme, _boardTheme);
         _nodeRenderer = new NodeRenderer(_primitiveRenderer, _spriteBatch, Palette, GetLabelTexture);
         _yukaiLarkMascotTexture = LoadTextureWithTransparentWhite(YukaiLarkMascotTexturePath);
@@ -177,7 +179,7 @@ public class Game1 : Game
         // ［開始ノード作成アシスト］の描画
         DrawYukaiLarkMascot(GraphicsDevice.Viewport, gameTime.TotalGameTime);
 
-        DrawInspectorPanel();
+        DrawPropertyWindow();
         _shortcutKeyRenderer.DrawBottomHelp(
             GraphicsDevice.Viewport,
             gameTime.TotalGameTime,
@@ -205,6 +207,7 @@ public class Game1 : Game
         _yukaiLarkMascotTexture?.Dispose();
         _yukaiLarkMascotTexture = null;
         _headerRenderer?.Dispose();
+        _propertyWindowRenderer?.Dispose();
         _shortcutKeyRenderer?.Dispose();
         base.UnloadContent();
     }
@@ -1895,24 +1898,15 @@ public class Game1 : Game
             DrawUiText);
     }
 
-    private void DrawInspectorPanel()
+    private void DrawPropertyWindow()
     {
-        var width = GraphicsDevice.Viewport.Width;
-        if (width < 560)
-        {
-            return;
-        }
-
-        const int panelWidth = 290;
-        var x = width - panelWidth - 12;
-        var bounds = new Rectangle(x, 70, panelWidth, 96);
-        _spriteBatch.Draw(_pixel, bounds, _boardTheme.PanelBackgroundColor);
-        _spriteBatch.Draw(_pixel, new Rectangle(bounds.X, bounds.Y, bounds.Width, 1), _boardTheme.PanelTopEdgeColor);
-        _spriteBatch.Draw(_pixel, new Rectangle(bounds.X, bounds.Bottom - 1, bounds.Width, 1), _boardTheme.PanelBottomEdgeColor);
-
-        DrawUiText($"状態: {_nodes.Count}    遷移: {_transitions.Count}", new Vector2(x + 12, bounds.Y + 10), _boardTheme.PanelPrimaryTextColor, 16, true);
-        DrawUiText(GetSelectionSummary(), new Vector2(x + 12, bounds.Y + 36), _boardTheme.PanelSecondaryTextColor, 15, false);
-        DrawUiText(GetFileSummary(), new Vector2(x + 12, bounds.Y + 62), _boardTheme.PanelMutedTextColor, 14, false);
+        _propertyWindowRenderer.DrawPropertyWindow(
+            GraphicsDevice.Viewport,
+            _nodes.Count,
+            _transitions.Count,
+            GetSelectionSummary(),
+            GetFileSummary(),
+            _boardTheme);
     }
 
     private string GetSelectionSummary()
@@ -2305,5 +2299,4 @@ public static class PrimitiveText
         }
     }
 }
-
 
