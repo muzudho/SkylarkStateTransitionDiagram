@@ -661,7 +661,7 @@ public class Game1 : Game
         else if (_editingTransition is not null)
         {
             _editingTransition.Label = label;
-            _status = "遷移ラベルを更新しました。Tabで表示位置を切り替えられます。";
+            _status = "遷移ラベルを更新しました。Tabでラベル左右を切り替えられます。";
         }
         _editingNode = null;
         _editingTransition = null;
@@ -693,7 +693,7 @@ public class Game1 : Game
     private void ToggleTransitionLabelSide(DiagramTransition transition)
     {
         transition.LabelSide = transition.LabelSide == 0 ? 1 : 0;
-        _status = "遷移ラベルの表示位置を切り替えました。";
+        _status = "遷移ラベルを左右で切り替えました。";
     }
     private void HandleMouse(KeyboardState keyboard, MouseState mouse)
     {
@@ -739,7 +739,7 @@ public class Game1 : Game
             _selectedTransition = node is null ? FindTransitionAt(mousePosition) : null;
             if (_selectedTransition is not null)
             {
-                _status = "遷移を選択しました。ハンドルで形を調整、F2・Enterでラベル編集。";
+                _status = "遷移を選択しました。F2・Enterでラベル編集、Tabでラベル左右切替、Deleteで削除できます。";
             }
             if (shiftDown && node is not null)
             {
@@ -1555,19 +1555,31 @@ public class Game1 : Game
             return;
         }
 
-        position = DrawShortcutHint(position, "Ctrl+P", "PNG出力");
-        position = DrawHelpSeparator(position);
-        position = DrawShortcutHint(position, "Alt", "吸着なし");
-
-        // ［遷移］エッジ選択中
         if (_selectedTransition is not null)
         {
+            position = DrawShortcutHint(position, "F2・Enter", "ラベル編集");
             position = DrawHelpSeparator(position);
-            position = DrawShortcutHint(position, "Tab", "遷移ラベル位置");
+            position = DrawShortcutHint(position, "Tab", "ラベル左右切替");
+            position = DrawHelpSeparator(position);
+            DrawShortcutHint(position, "Delete", "遷移削除");
+            return;
         }
 
+        if (_selectedNode is not null)
+        {
+            position = DrawShortcutHint(position, "F2・Enter", "ラベル編集");
+            position = DrawHelpSeparator(position);
+            position = DrawShortcutHint(position, "T", "状態種別変更");
+            position = DrawHelpSeparator(position);
+            position = DrawShortcutHint(position, "C", "状態色変更");
+            position = DrawHelpSeparator(position);
+            DrawShortcutHint(position, "Delete", "状態削除");
+            return;
+        }
+
+        position = DrawShortcutHint(position, "Ctrl+P", "画像保存");
         position = DrawHelpSeparator(position);
-        position = DrawShortcutHint(position, "Delete", "削除");
+        position = DrawShortcutHint(position, "Alt", "吸着なし");
         position = DrawHelpSeparator(position);
         position = DrawShortcutHint(position, "0-9", "テーマ");
         position = DrawHelpSeparator(position);
