@@ -37,6 +37,7 @@ internal static class YukaiLarkAssistOperations
             YukaiLarkAssistKind.CreateStateNode => CreateStateNode(operation),
             YukaiLarkAssistKind.CreateTransition => CreateTransition(operation),
             YukaiLarkAssistKind.AddTransitionEvent => AddTransitionEvent(operation),
+            YukaiLarkAssistKind.CreateEndNode => CreateEndNode(operation),
             _ => new YukaiLarkAssistOperationResult(operation.NextNodeId, null, null, string.Empty, false)
         };
 
@@ -66,6 +67,35 @@ internal static class YukaiLarkAssistOperations
             selectedNode,
             null,
             "開始ノードを作成しました。次はNで状態追加、Shift+ドラッグで遷移作成。",
+            selectedNode is not null);
+    }
+
+    private static YukaiLarkAssistOperationResult CreateEndNode(YukaiLarkAssistOperation operation)
+    {
+        var nextNodeId = operation.NextNodeId;
+        DiagramNode? selectedNode = null;
+        var screenPosition = operation.GetNodeScreenPosition(operation.Viewport, YukaiLarkAssistKind.CreateEndNode);
+        var worldPosition = operation.ScreenToWorld(screenPosition);
+        operation.ExecuteUndoableChange(() =>
+        {
+            var node = new DiagramNode
+            {
+                Id = nextNodeId++,
+                Label = "終了",
+                Position = operation.SnapToHalfGrid(worldPosition),
+                RadiusUnits = DiagramNode.DefaultRadiusUnits,
+                ColorIndex = 0,
+                Kind = NodeKind.End
+            };
+            operation.Nodes.Add(node);
+            selectedNode = node;
+        });
+
+        return new YukaiLarkAssistOperationResult(
+            nextNodeId,
+            selectedNode,
+            null,
+            "終了ノードを作成しました。必要なら状態から終了へ遷移をつなげます。",
             selectedNode is not null);
     }
 

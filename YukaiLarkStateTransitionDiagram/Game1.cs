@@ -215,6 +215,7 @@ public class Game1 : Game
         var missingTransitionEventSummary = GetMissingTransitionEventSummary();
         return new YukaiLarkAssistantContext(
             _nodes.Any(node => node.Kind == NodeKind.Start),
+            _nodes.Any(node => node.Kind == NodeKind.End),
             _nodes.Count,
             _transitions.Count,
             !string.IsNullOrEmpty(missingTransitionEventSummary),
