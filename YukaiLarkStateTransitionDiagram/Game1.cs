@@ -70,6 +70,7 @@ public class Game1 : Game
     private readonly Dictionary<string, Texture2D> _labelTextureCache = new();
     private readonly Dictionary<string, Texture2D> _uiTextTextureCache = new();
     private PrimitiveRenderer _primitiveRenderer = null!;
+    private EdgeRenderer _edgeRenderer = null!;
     private NodeRenderer _nodeRenderer = null!;
     private IKeyCapTheme _keyCapTheme = KeyCapThemes.Current;
     private BoardTheme _boardTheme = BoardThemes.ForKeyCapTheme(KeyCapThemes.Current);
@@ -128,6 +129,7 @@ public class Game1 : Game
         _pixel = new Texture2D(GraphicsDevice, 1, 1);
         _pixel.SetData(new[] { Color.White });
         _primitiveRenderer = new PrimitiveRenderer(_spriteBatch, _pixel);
+        _edgeRenderer = new EdgeRenderer(_primitiveRenderer, _spriteBatch, GetLabelTexture, _boardTheme);
         _nodeRenderer = new NodeRenderer(_primitiveRenderer, _spriteBatch, Palette, GetLabelTexture);
     }
     protected override void Update(GameTime gameTime)
@@ -306,6 +308,7 @@ public class Game1 : Game
 
         _keyCapTheme = KeyCapThemes.ShortcutThemes[themeIndex];
         _boardTheme = BoardThemes.ForKeyCapTheme(_keyCapTheme);
+        _edgeRenderer.Theme = _boardTheme;
         _status = $"テーマを {themeIndex}: {_keyCapTheme.Name} に切り替えました。背景とPNG出力にも反映します。";
     }
 
@@ -1304,7 +1307,7 @@ public class Game1 : Game
             };
             if (center != Vector2.Zero)
             {
-                _primitiveRenderer.DrawCircleOutline(center, 13f, new Color(255, 245, 170), 3f);
+                _edgeRenderer.DrawTransitionHandleCue(center);
             }
             return;
         }
@@ -1322,7 +1325,7 @@ public class Game1 : Game
         var transition = FindTransitionAt(mouseWorld);
         if (transition is not null && transition != _selectedTransition && TryGetTransitionGeometry(transition, out start, out control1, out control2, out end))
         {
-            DrawBezierArrow(start, control1, control2, end, new Color(115, 170, 220, 180), 5f);
+            _edgeRenderer.DrawTransitionHoverCue(start, control1, control2, end);
         }
     }
 
@@ -1338,7 +1341,18 @@ public class Game1 : Game
     {
         foreach (var transition in _transitions)
         {
-            DrawTransition(transition, includeInteraction && transition == _selectedTransition);
+            if (TryGetTransitionGeometry(transition, out var start, out var control1, out var control2, out var end))
+            {
+                _edgeRenderer.DrawTransition(
+                    transition,
+                    start,
+                    control1,
+                    control2,
+                    end,
+                    includeInteraction && transition == _selectedTransition,
+                    transition == _editingTransition,
+                    _editingLabel);
+            }
         }
         if (includeInteraction)
         {
@@ -1346,7 +1360,7 @@ public class Game1 : Game
             if (_linkSource is not null)
             {
                 var mouse = Mouse.GetState();
-                DrawArrow(_linkSource.Position, ScreenToWorld(mouse.Position.ToVector2()), new Color(250, 205, 95), 3f);
+                _edgeRenderer.DrawLinkPreview(_linkSource.Position, ScreenToWorld(mouse.Position.ToVector2()));
             }
         }
         foreach (var node in _nodes)
@@ -1359,7 +1373,10 @@ public class Game1 : Game
         }
         if (includeInteraction && _selectedTransition is not null)
         {
-            DrawTransitionHandles(_selectedTransition);
+            if (TryGetTransitionGeometry(_selectedTransition, out var start, out var control1, out var control2, out var end))
+            {
+                _edgeRenderer.DrawTransitionHandles(start, control1, control2, end);
+            }
         }
     }
 
@@ -1728,87 +1745,6 @@ public class Game1 : Game
     {
         FormatFlags = DrawingStringFormatFlags.NoWrap
     };
-    private void DrawTransition(DiagramTransition transition, bool selected)
-    {
-        if (!TryGetTransitionGeometry(transition, out var start, out var control1, out var control2, out var end))
-        {
-            return;
-        }
-
-        DrawBezierArrow(start, control1, control2, end, selected ? new Color(255, 230, 120) : _boardTheme.TransitionLineColor, selected ? 4f : 3f);
-        DrawTransitionLabel(transition, start, control1, control2, end, selected);
-    }
-
-    private void DrawTransitionHandles(DiagramTransition transition)
-    {
-        if (!TryGetTransitionGeometry(transition, out var start, out var control1, out var control2, out var end))
-        {
-            return;
-        }
-
-        _primitiveRenderer.DrawLine(start, control1, new Color(95, 120, 145), 1f);
-        _primitiveRenderer.DrawLine(end, control2, new Color(95, 120, 145), 1f);
-        _primitiveRenderer.DrawHandle(start, new Color(255, 230, 120));
-        _primitiveRenderer.DrawHandle(end, new Color(255, 230, 120));
-        _primitiveRenderer.DrawHandle(control1, new Color(80, 190, 230));
-        _primitiveRenderer.DrawHandle(control2, new Color(80, 190, 230));
-    }
-
-    private void DrawTransitionLabel(DiagramTransition transition, Vector2 start, Vector2 control1, Vector2 control2, Vector2 end, bool selected)
-    {
-        var editing = transition == _editingTransition;
-        var label = editing ? _editingLabel + "_" : transition.Label;
-        if (string.IsNullOrWhiteSpace(label) && !editing)
-        {
-            return;
-        }
-        var texture = GetLabelTexture(label, editing || selected);
-        var center = GetTransitionLabelCenter(start, control1, control2, end, transition.LabelSide, texture);
-        var position = center - new Vector2(texture.Width / 2f, texture.Height / 2f);
-        _spriteBatch.Draw(texture, position, selected ? new Color(255, 230, 120) : _boardTheme.TransitionLabelColor);
-    }
-
-    private static Vector2 GetTransitionLabelCenter(Vector2 start, Vector2 control1, Vector2 control2, Vector2 end, int labelSide, Texture2D labelTexture)
-    {
-        var midpoint = CubicBezier(start, control1, control2, end, 0.5f);
-        var tangent = CubicBezierTangent(start, control1, control2, end, 0.5f);
-        var side = labelSide == 0 ? -1f : 1f;
-        if (MathF.Abs(tangent.X) >= MathF.Abs(tangent.Y))
-        {
-            return midpoint + new Vector2(0, side * (labelTexture.Height / 2f + 18f));
-        }
-        return midpoint + new Vector2(side * (labelTexture.Width / 2f + 22f), 0);
-    }
-
-    private void DrawBezierArrow(Vector2 start, Vector2 control1, Vector2 control2, Vector2 end, Color color, float thickness)
-    {
-        const int segments = 32;
-        var previous = start;
-        for (var i = 1; i <= segments; i++)
-        {
-            var t = i / (float)segments;
-            var current = CubicBezier(start, control1, control2, end, t);
-            _primitiveRenderer.DrawLine(previous, current, color, thickness);
-            previous = current;
-        }
-
-        var tangent = CubicBezierTangent(start, control1, control2, end, 1f);
-        DrawArrowHead(end, tangent, color, thickness);
-    }
-
-    private void DrawArrowHead(Vector2 tip, Vector2 tangent, Color color, float thickness)
-    {
-        if (tangent.LengthSquared() <= 0.01f)
-        {
-            return;
-        }
-
-        var direction = Vector2.Normalize(tangent);
-        var normal = new Vector2(-direction.Y, direction.X);
-        _primitiveRenderer.DrawLine(tip, tip - direction * 18 + normal * 8, color, thickness);
-        _primitiveRenderer.DrawLine(tip, tip - direction * 18 - normal * 8, color, thickness);
-    }
-
     private static Vector2 CubicBezier(Vector2 start, Vector2 control1, Vector2 control2, Vector2 end, float t)
     {
         var u = 1f - t;
@@ -1824,15 +1760,6 @@ public class Game1 : Game
         return 3f * u * u * (control1 - start)
             + 6f * u * t * (control2 - control1)
             + 3f * t * t * (end - control2);
-    }
-    private void DrawArrow(Vector2 start, Vector2 end, Color color, float thickness)
-    {
-        _primitiveRenderer.DrawLine(start, end, color, thickness);
-        var direction = Vector2.Normalize(end - start);
-        var normal = new Vector2(-direction.Y, direction.X);
-        var tip = end;
-        _primitiveRenderer.DrawLine(tip, tip - direction * 18 + normal * 8, color, thickness);
-        _primitiveRenderer.DrawLine(tip, tip - direction * 18 - normal * 8, color, thickness);
     }
     private void DrawText(string text, Vector2 position, Color color, int scale)
     {
@@ -1970,24 +1897,29 @@ public sealed record BoardTheme(
     Color PhotoEdgeColor,
     Color PinColor,
     Color TransitionLineColor,
-    Color TransitionLabelColor);
+    Color TransitionLabelColor,
+    Color SelectedTransitionLineColor,
+    Color SelectedTransitionLabelColor,
+    Color TransitionHandleColor,
+    Color TransitionControlHandleColor,
+    Color TransitionGuideColor);
 
 public static class BoardThemes
 {
     public static BoardTheme ForKeyCapTheme(IKeyCapTheme keyCapTheme)
         => keyCapTheme.Name switch
         {
-            "YukaiLark" => new BoardTheme(new Color(238, 250, 239), new Color(178, 219, 203), new Color(222, 244, 233), new Color(255, 253, 239), new Color(233, 188, 96), new Color(83, 178, 176), new Color(63, 98, 116), new Color(51, 84, 102)),
-            "Gaming" => new BoardTheme(new Color(18, 20, 28), new Color(42, 88, 96), new Color(15, 18, 24), new Color(230, 236, 232), new Color(78, 104, 108), new Color(88, 232, 206), new Color(102, 245, 255), new Color(210, 255, 251)),
-            "Retro" => new BoardTheme(new Color(116, 82, 52), new Color(149, 109, 70), new Color(98, 65, 40), new Color(241, 229, 198), new Color(155, 125, 82), new Color(190, 54, 44), new Color(244, 222, 184), new Color(255, 238, 206)),
-            "CopyPaper" => new BoardTheme(new Color(226, 229, 224), new Color(198, 205, 202), new Color(190, 185, 174), new Color(252, 250, 242), new Color(190, 184, 172), new Color(60, 112, 178), new Color(52, 82, 128), new Color(28, 54, 92)),
-            "Girly" => new BoardTheme(new Color(67, 47, 62), new Color(119, 78, 104), new Color(92, 62, 78), new Color(255, 236, 240), new Color(205, 142, 162), new Color(232, 92, 132), new Color(255, 176, 214), new Color(255, 229, 240)),
-            "Edo" => new BoardTheme(new Color(36, 45, 50), new Color(70, 86, 82), new Color(41, 35, 30), new Color(238, 231, 207), new Color(123, 88, 54), new Color(178, 48, 44), new Color(222, 196, 149), new Color(248, 229, 187)),
-            "Monochrome" => new BoardTheme(new Color(34, 34, 34), new Color(68, 68, 68), new Color(24, 24, 24), new Color(235, 235, 228), new Color(120, 120, 114), new Color(210, 210, 210), new Color(230, 230, 230), new Color(250, 250, 250)),
-            "Mint" => new BoardTheme(new Color(29, 61, 57), new Color(63, 104, 96), new Color(46, 82, 74), new Color(235, 250, 239), new Color(126, 170, 152), new Color(76, 198, 157), new Color(152, 223, 199), new Color(211, 251, 238)),
-            "Amber" => new BoardTheme(new Color(66, 49, 34), new Color(112, 83, 48), new Color(86, 61, 35), new Color(248, 229, 188), new Color(176, 126, 56), new Color(225, 151, 48), new Color(247, 221, 156), new Color(255, 242, 200)),
-            "Midnight" => new BoardTheme(new Color(17, 24, 34), new Color(37, 52, 68), new Color(14, 19, 28), new Color(230, 234, 232), new Color(90, 102, 116), new Color(96, 154, 232), new Color(118, 181, 255), new Color(214, 233, 255)),
-            _ => new BoardTheme(new Color(28, 31, 36), new Color(42, 46, 52), new Color(104, 73, 48), new Color(244, 236, 218), new Color(150, 132, 106), new Color(190, 54, 44), new Color(234, 181, 128), new Color(255, 233, 209))
+            "YukaiLark" => new BoardTheme(new Color(238, 250, 239), new Color(178, 219, 203), new Color(222, 244, 233), new Color(255, 253, 239), new Color(233, 188, 96), new Color(83, 178, 176), new Color(63, 98, 116), new Color(51, 84, 102), new Color(255, 230, 120), new Color(255, 242, 201), new Color(83, 178, 176), new Color(80, 190, 230), new Color(116, 138, 152)),
+            "Gaming" => new BoardTheme(new Color(18, 20, 28), new Color(42, 88, 96), new Color(15, 18, 24), new Color(230, 236, 232), new Color(78, 104, 108), new Color(88, 232, 206), new Color(102, 245, 255), new Color(210, 255, 251), new Color(255, 230, 120), new Color(255, 246, 214), new Color(88, 232, 206), new Color(80, 190, 230), new Color(60, 120, 130)),
+            "Retro" => new BoardTheme(new Color(116, 82, 52), new Color(149, 109, 70), new Color(98, 65, 40), new Color(241, 229, 198), new Color(155, 125, 82), new Color(190, 54, 44), new Color(244, 222, 184), new Color(255, 238, 206), new Color(255, 230, 120), new Color(255, 245, 224), new Color(190, 54, 44), new Color(80, 190, 230), new Color(165, 132, 98)),
+            "CopyPaper" => new BoardTheme(new Color(226, 229, 224), new Color(198, 205, 202), new Color(190, 185, 174), new Color(252, 250, 242), new Color(190, 184, 172), new Color(60, 112, 178), new Color(52, 82, 128), new Color(28, 54, 92), new Color(255, 160, 96), new Color(42, 76, 124), new Color(60, 112, 178), new Color(80, 190, 230), new Color(104, 128, 148)),
+            "Girly" => new BoardTheme(new Color(67, 47, 62), new Color(119, 78, 104), new Color(92, 62, 78), new Color(255, 236, 240), new Color(205, 142, 162), new Color(232, 92, 132), new Color(255, 176, 214), new Color(255, 229, 240), new Color(255, 230, 120), new Color(255, 244, 248), new Color(232, 92, 132), new Color(80, 190, 230), new Color(170, 112, 150)),
+            "Edo" => new BoardTheme(new Color(36, 45, 50), new Color(70, 86, 82), new Color(41, 35, 30), new Color(238, 231, 207), new Color(123, 88, 54), new Color(178, 48, 44), new Color(222, 196, 149), new Color(248, 229, 187), new Color(255, 230, 120), new Color(250, 239, 212), new Color(178, 48, 44), new Color(80, 190, 230), new Color(135, 118, 84)),
+            "Monochrome" => new BoardTheme(new Color(34, 34, 34), new Color(68, 68, 68), new Color(24, 24, 24), new Color(235, 235, 228), new Color(120, 120, 114), new Color(210, 210, 210), new Color(230, 230, 230), new Color(250, 250, 250), new Color(255, 220, 90), new Color(255, 252, 236), new Color(210, 210, 210), new Color(80, 190, 230), new Color(160, 160, 160)),
+            "Mint" => new BoardTheme(new Color(29, 61, 57), new Color(63, 104, 96), new Color(46, 82, 74), new Color(235, 250, 239), new Color(126, 170, 152), new Color(76, 198, 157), new Color(152, 223, 199), new Color(211, 251, 238), new Color(255, 230, 120), new Color(234, 255, 245), new Color(76, 198, 157), new Color(80, 190, 230), new Color(114, 176, 156)),
+            "Amber" => new BoardTheme(new Color(66, 49, 34), new Color(112, 83, 48), new Color(86, 61, 35), new Color(248, 229, 188), new Color(176, 126, 56), new Color(225, 151, 48), new Color(247, 221, 156), new Color(255, 242, 200), new Color(255, 230, 120), new Color(255, 247, 221), new Color(225, 151, 48), new Color(80, 190, 230), new Color(177, 134, 84)),
+            "Midnight" => new BoardTheme(new Color(17, 24, 34), new Color(37, 52, 68), new Color(14, 19, 28), new Color(230, 234, 232), new Color(90, 102, 116), new Color(96, 154, 232), new Color(118, 181, 255), new Color(214, 233, 255), new Color(255, 230, 120), new Color(245, 250, 255), new Color(96, 154, 232), new Color(80, 190, 230), new Color(92, 118, 146)),
+            _ => new BoardTheme(new Color(28, 31, 36), new Color(42, 46, 52), new Color(104, 73, 48), new Color(244, 236, 218), new Color(150, 132, 106), new Color(190, 54, 44), new Color(234, 181, 128), new Color(255, 233, 209), new Color(255, 230, 120), new Color(255, 244, 224), new Color(190, 54, 44), new Color(80, 190, 230), new Color(146, 126, 104))
         };
 }
 public static class PrimitiveText
