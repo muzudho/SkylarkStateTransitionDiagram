@@ -85,6 +85,21 @@ public sealed class EdgeRenderer
     }
 
     /// <summary>
+    /// 作成前の遷移を薄く描画します。
+    /// </summary>
+    /// <param name="start"></param>
+    /// <param name="control1"></param>
+    /// <param name="control2"></param>
+    /// <param name="end"></param>
+    /// <param name="opacity">不透明度</param>
+    public void DrawTransitionGhost(Vector2 start, Vector2 control1, Vector2 control2, Vector2 end, float opacity)
+    {
+        var alpha = MathHelper.Clamp(opacity, 0f, 1f);
+        DrawBezierArrow(start, control1, control2, end, Theme.SelectedTransitionLineColor * (alpha * 0.68f), 5f);
+        DrawBezierArrow(start, control1, control2, end, Theme.TransitionLineColor * (alpha * 0.42f), 3f);
+    }
+
+    /// <summary>
     /// ベジェ曲線の矢印を描く
     /// </summary>
     /// <param name="center"></param>

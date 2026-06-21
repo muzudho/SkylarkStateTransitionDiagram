@@ -1629,6 +1629,11 @@ public class Game1 : Game
 
     private void DrawDiagramContent(bool includeInteraction, TimeSpan totalGameTime)
     {
+        if (includeInteraction)
+        {
+            DrawTransitionGhost(totalGameTime);
+        }
+
         foreach (var transition in _transitions)
         {
             if (TryGetTransitionGeometry(transition, out var start, out var control1, out var control2, out var end))
@@ -1675,7 +1680,6 @@ public class Game1 : Game
         }
     }
 
-
     private void DrawStartNodeGhost(TimeSpan totalGameTime)
     {
         var context = CreateAssistantContext();
@@ -1719,6 +1723,32 @@ public class Game1 : Game
             Kind = NodeKind.Normal
         };
         _nodeRenderer.DrawStateNodeGhost(ghostNode, 1f);
+    }
+
+    private void DrawTransitionGhost(TimeSpan totalGameTime)
+    {
+        var context = CreateAssistantContext();
+        if (!_yukaiLarkAssistant.ShouldDrawTransitionGhost(context))
+        {
+            return;
+        }
+
+        var source = _nodes.FirstOrDefault(node => node.Kind == NodeKind.Start);
+        var target = _nodes.FirstOrDefault(node => node.Kind != NodeKind.Start);
+        if (source is null || target is null || _transitions.Any(t => t.SourceId == source.Id && t.TargetId == target.Id))
+        {
+            return;
+        }
+
+        var transition = new DiagramTransition { SourceId = source.Id, TargetId = target.Id };
+        InitializeTransitionEndpoints(transition);
+        if (!TryGetTransitionGeometry(transition, out var start, out var control1, out var control2, out var end))
+        {
+            return;
+        }
+
+        var offset = new Vector2(0f, YukaiLarkAssistant.GetAssistBobOffset(totalGameTime));
+        _edgeRenderer.DrawTransitionGhost(start + offset, control1 + offset, control2 + offset, end + offset, 1f);
     }
 
     private void DrawExportSelectionOverlay()

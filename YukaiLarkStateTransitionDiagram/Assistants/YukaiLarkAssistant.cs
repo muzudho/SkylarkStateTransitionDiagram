@@ -79,6 +79,9 @@ internal sealed class YukaiLarkAssistant
     public bool ShouldDrawStateNodeGhost(YukaiLarkAssistantContext context)
         => IsAssistReady && GetAssistKind(context) == YukaiLarkAssistKind.CreateStateNode;
 
+    public bool ShouldDrawTransitionGhost(YukaiLarkAssistantContext context)
+        => IsAssistReady && GetAssistKind(context) == YukaiLarkAssistKind.CreateTransition;
+
     public static float GetAssistBobOffset(TimeSpan totalGameTime)
         => MathF.Sin((float)totalGameTime.TotalSeconds * 8.5f) * 8f;
 
