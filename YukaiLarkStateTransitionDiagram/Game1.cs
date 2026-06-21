@@ -1905,7 +1905,6 @@ public class Game1 : Game
             _nodes.Count,
             _transitions.Count,
             GetSelectionSummary(),
-            GetFileSummary(),
             _boardTheme);
     }
 
@@ -1933,8 +1932,6 @@ public class Game1 : Game
     private string GetHeaderTitle()
         => _currentFilePath is null ? "未保存のダイアグラム" : Path.GetFileName(_currentFilePath);
 
-    private string GetFileSummary()
-        => _currentFilePath is null ? "保存先: 未指定" : $"保存先: {Path.GetFileName(_currentFilePath)}";
     private float DrawUiText(string text, Vector2 position, Color color, float size, bool bold)
     {
         var texture = GetUiTextTexture(text, size, bold);

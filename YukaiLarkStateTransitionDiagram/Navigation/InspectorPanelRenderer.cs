@@ -12,7 +12,7 @@ public sealed class InspectorPanelRenderer : IDisposable
 {
     private const int MinimumVisibleWidth = 560;
     private const int PanelWidth = 290;
-    private const int PanelHeight = 96;
+    private const int PanelHeight = 70;
     private const int PanelRightMargin = 12;
     private const int PanelTop = 70;
 
@@ -43,7 +43,6 @@ public sealed class InspectorPanelRenderer : IDisposable
         int nodeCount,
         int transitionCount,
         string selectionSummary,
-        string fileSummary,
         BoardTheme theme)
     {
         if (viewport.Width < MinimumVisibleWidth)
@@ -59,7 +58,6 @@ public sealed class InspectorPanelRenderer : IDisposable
 
         DrawUiText($"状態: {nodeCount}    遷移: {transitionCount}", new Vector2(x + 12, bounds.Y + 10), theme.PanelPrimaryTextColor, 16, true);
         DrawUiText(selectionSummary, new Vector2(x + 12, bounds.Y + 36), theme.PanelSecondaryTextColor, 15, false);
-        DrawUiText(fileSummary, new Vector2(x + 12, bounds.Y + 62), theme.PanelMutedTextColor, 14, false);
     }
 
     private float DrawUiText(string text, Vector2 position, Color color, float size, bool bold)
