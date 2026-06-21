@@ -1735,7 +1735,7 @@ public class Game1 : Game
             return;
         }
 
-        DrawBezierArrow(start, control1, control2, end, selected ? new Color(255, 230, 120) : new Color(185, 195, 210), selected ? 4f : 3f);
+        DrawBezierArrow(start, control1, control2, end, selected ? new Color(255, 230, 120) : _boardTheme.TransitionLineColor, selected ? 4f : 3f);
         DrawTransitionLabel(transition, start, control1, control2, end, selected);
     }
 
@@ -1765,7 +1765,7 @@ public class Game1 : Game
         var texture = GetLabelTexture(label, editing || selected);
         var center = GetTransitionLabelCenter(start, control1, control2, end, transition.LabelSide, texture);
         var position = center - new Vector2(texture.Width / 2f, texture.Height / 2f);
-        _spriteBatch.Draw(texture, position, Color.White);
+        _spriteBatch.Draw(texture, position, selected ? new Color(255, 230, 120) : _boardTheme.TransitionLabelColor);
     }
 
     private static Vector2 GetTransitionLabelCenter(Vector2 start, Vector2 control1, Vector2 control2, Vector2 end, int labelSide, Texture2D labelTexture)
@@ -1968,24 +1968,26 @@ public sealed record BoardTheme(
     Color ExportBackdropColor,
     Color PhotoPaperColor,
     Color PhotoEdgeColor,
-    Color PinColor);
+    Color PinColor,
+    Color TransitionLineColor,
+    Color TransitionLabelColor);
 
 public static class BoardThemes
 {
     public static BoardTheme ForKeyCapTheme(IKeyCapTheme keyCapTheme)
         => keyCapTheme.Name switch
         {
-            "YukaiLark" => new BoardTheme(new Color(238, 250, 239), new Color(178, 219, 203), new Color(222, 244, 233), new Color(255, 253, 239), new Color(233, 188, 96), new Color(83, 178, 176)),
-            "Gaming" => new BoardTheme(new Color(18, 20, 28), new Color(42, 88, 96), new Color(15, 18, 24), new Color(230, 236, 232), new Color(78, 104, 108), new Color(88, 232, 206)),
-            "Retro" => new BoardTheme(new Color(116, 82, 52), new Color(149, 109, 70), new Color(98, 65, 40), new Color(241, 229, 198), new Color(155, 125, 82), new Color(190, 54, 44)),
-            "CopyPaper" => new BoardTheme(new Color(226, 229, 224), new Color(198, 205, 202), new Color(190, 185, 174), new Color(252, 250, 242), new Color(190, 184, 172), new Color(60, 112, 178)),
-            "Girly" => new BoardTheme(new Color(67, 47, 62), new Color(119, 78, 104), new Color(92, 62, 78), new Color(255, 236, 240), new Color(205, 142, 162), new Color(232, 92, 132)),
-            "Edo" => new BoardTheme(new Color(36, 45, 50), new Color(70, 86, 82), new Color(41, 35, 30), new Color(238, 231, 207), new Color(123, 88, 54), new Color(178, 48, 44)),
-            "Monochrome" => new BoardTheme(new Color(34, 34, 34), new Color(68, 68, 68), new Color(24, 24, 24), new Color(235, 235, 228), new Color(120, 120, 114), new Color(210, 210, 210)),
-            "Mint" => new BoardTheme(new Color(29, 61, 57), new Color(63, 104, 96), new Color(46, 82, 74), new Color(235, 250, 239), new Color(126, 170, 152), new Color(76, 198, 157)),
-            "Amber" => new BoardTheme(new Color(66, 49, 34), new Color(112, 83, 48), new Color(86, 61, 35), new Color(248, 229, 188), new Color(176, 126, 56), new Color(225, 151, 48)),
-            "Midnight" => new BoardTheme(new Color(17, 24, 34), new Color(37, 52, 68), new Color(14, 19, 28), new Color(230, 234, 232), new Color(90, 102, 116), new Color(96, 154, 232)),
-            _ => new BoardTheme(new Color(28, 31, 36), new Color(42, 46, 52), new Color(104, 73, 48), new Color(244, 236, 218), new Color(150, 132, 106), new Color(190, 54, 44))
+            "YukaiLark" => new BoardTheme(new Color(238, 250, 239), new Color(178, 219, 203), new Color(222, 244, 233), new Color(255, 253, 239), new Color(233, 188, 96), new Color(83, 178, 176), new Color(63, 98, 116), new Color(51, 84, 102)),
+            "Gaming" => new BoardTheme(new Color(18, 20, 28), new Color(42, 88, 96), new Color(15, 18, 24), new Color(230, 236, 232), new Color(78, 104, 108), new Color(88, 232, 206), new Color(102, 245, 255), new Color(210, 255, 251)),
+            "Retro" => new BoardTheme(new Color(116, 82, 52), new Color(149, 109, 70), new Color(98, 65, 40), new Color(241, 229, 198), new Color(155, 125, 82), new Color(190, 54, 44), new Color(244, 222, 184), new Color(255, 238, 206)),
+            "CopyPaper" => new BoardTheme(new Color(226, 229, 224), new Color(198, 205, 202), new Color(190, 185, 174), new Color(252, 250, 242), new Color(190, 184, 172), new Color(60, 112, 178), new Color(52, 82, 128), new Color(28, 54, 92)),
+            "Girly" => new BoardTheme(new Color(67, 47, 62), new Color(119, 78, 104), new Color(92, 62, 78), new Color(255, 236, 240), new Color(205, 142, 162), new Color(232, 92, 132), new Color(255, 176, 214), new Color(255, 229, 240)),
+            "Edo" => new BoardTheme(new Color(36, 45, 50), new Color(70, 86, 82), new Color(41, 35, 30), new Color(238, 231, 207), new Color(123, 88, 54), new Color(178, 48, 44), new Color(222, 196, 149), new Color(248, 229, 187)),
+            "Monochrome" => new BoardTheme(new Color(34, 34, 34), new Color(68, 68, 68), new Color(24, 24, 24), new Color(235, 235, 228), new Color(120, 120, 114), new Color(210, 210, 210), new Color(230, 230, 230), new Color(250, 250, 250)),
+            "Mint" => new BoardTheme(new Color(29, 61, 57), new Color(63, 104, 96), new Color(46, 82, 74), new Color(235, 250, 239), new Color(126, 170, 152), new Color(76, 198, 157), new Color(152, 223, 199), new Color(211, 251, 238)),
+            "Amber" => new BoardTheme(new Color(66, 49, 34), new Color(112, 83, 48), new Color(86, 61, 35), new Color(248, 229, 188), new Color(176, 126, 56), new Color(225, 151, 48), new Color(247, 221, 156), new Color(255, 242, 200)),
+            "Midnight" => new BoardTheme(new Color(17, 24, 34), new Color(37, 52, 68), new Color(14, 19, 28), new Color(230, 234, 232), new Color(90, 102, 116), new Color(96, 154, 232), new Color(118, 181, 255), new Color(214, 233, 255)),
+            _ => new BoardTheme(new Color(28, 31, 36), new Color(42, 46, 52), new Color(104, 73, 48), new Color(244, 236, 218), new Color(150, 132, 106), new Color(190, 54, 44), new Color(234, 181, 128), new Color(255, 233, 209))
         };
 }
 public static class PrimitiveText
