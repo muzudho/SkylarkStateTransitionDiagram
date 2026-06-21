@@ -50,10 +50,14 @@ public sealed class NodeRenderer
         // 開始ノード、終了ノード
         else
         {
-            _primitiveRenderer.DrawCircleOutline(node.Position, node.Radius, Color.White, node.Kind == NodeKind.Start ? 4f : 3f);
-            if (node.Kind == NodeKind.End)
+            if (node.Kind == NodeKind.Start)
             {
-                _primitiveRenderer.DrawCircleOutline(node.Position, node.Radius - 10f, Color.White, 3f);
+                _primitiveRenderer.DrawCircleOutline(node.Position, node.Radius, Color.White, 6f);
+            }
+            else
+            {
+                _primitiveRenderer.DrawCircleOutline(node.Position, node.Radius, Color.White, 2f);
+                _primitiveRenderer.DrawCircleOutline(node.Position, node.Radius - 10f, Color.White, 2f);
             }
         }
 
