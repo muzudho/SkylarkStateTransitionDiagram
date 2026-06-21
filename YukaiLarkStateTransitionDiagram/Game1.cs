@@ -160,7 +160,13 @@ public class Game1 : Game
         _spriteBatch.Begin(samplerState: SamplerState.LinearClamp);
         DrawToolbar();
         DrawInspectorPanel();
-        _shortcutKeyRenderer.DrawBottomHelp(GraphicsDevice.Viewport, _isExportSelecting, _selectedNode, _selectedTransition);
+        _shortcutKeyRenderer.DrawBottomHelp(
+            GraphicsDevice.Viewport,
+            gameTime.TotalGameTime,
+            IsEditingLabel,
+            _isExportSelecting,
+            _selectedNode,
+            _selectedTransition);
         DrawExportSelectionOverlay();
         _spriteBatch.End();
         base.Draw(gameTime);

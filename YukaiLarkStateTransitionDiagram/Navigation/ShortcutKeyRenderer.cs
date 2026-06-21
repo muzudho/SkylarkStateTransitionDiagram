@@ -11,11 +11,15 @@ using YukaiLarkStateTransitionDiagram.Theme;
 /// </summary>
 public sealed class ShortcutKeyRenderer : IDisposable
 {
+    private static readonly TimeSpan HelpPageDuration = TimeSpan.FromSeconds(5);
     private readonly GraphicsDevice _graphicsDevice;
     private readonly SpriteBatch _spriteBatch;
     private readonly Texture2D _pixel;
     private readonly Dictionary<string, Texture2D> _uiTextTextureCache = new();
     private IKeyCapTheme _keyCapTheme;
+
+    private readonly record struct HelpHint(string Key, string Description);
+    private readonly record struct HelpPage(HelpHint[] Hints);
 
     public ShortcutKeyRenderer(GraphicsDevice graphicsDevice, SpriteBatch spriteBatch, Texture2D pixel, IKeyCapTheme keyCapTheme)
     {
@@ -45,11 +49,15 @@ public sealed class ShortcutKeyRenderer : IDisposable
     /// ショートカットキーの描画
     /// </summary>
     /// <param name="viewport">描画領域のビューポート</param>
+    /// <param name="totalGameTime">ゲーム開始からの経過時間</param>
+    /// <param name="isEditingLabel">ラベル編集中かどうか</param>
     /// <param name="isExportSelecting">エクスポート選択中かどうか</param>
     /// <param name="selectedNode">選択されているノード</param>
     /// <param name="selectedTransition">選択されている遷移</param>
     public void DrawBottomHelp(
         Viewport viewport,
+        TimeSpan totalGameTime,
+        bool isEditingLabel,
         bool isExportSelecting,
         DiagramNode? selectedNode,
         DiagramTransition? selectedTransition)
@@ -62,48 +70,178 @@ public sealed class ShortcutKeyRenderer : IDisposable
         var y = viewport.Height - 34;
         _spriteBatch.Draw(_pixel, new Rectangle(0, y, viewport.Width, 34), new Color(17, 19, 23, 210));
 
+        var pages = GetHelpPages(isEditingLabel, isExportSelecting, selectedNode, selectedTransition);
+        if (pages.Length == 0)
+        {
+            return;
+        }
+
+        var pageIndex = (int)(totalGameTime.TotalSeconds / HelpPageDuration.TotalSeconds) % pages.Length;
+        var page = pages[pageIndex];
         var position = new Vector2(12, y + 6);
+        for (var i = 0; i < page.Hints.Length; i++)
+        {
+            var hint = page.Hints[i];
+            position = DrawShortcutHint(position, hint.Key, hint.Description);
+            if (i < page.Hints.Length - 1)
+            {
+                position = DrawHelpSeparator(position);
+            }
+        }
+    }
+
+    private static HelpPage[] GetHelpPages(
+        bool isEditingLabel,
+        bool isExportSelecting,
+        DiagramNode? selectedNode,
+        DiagramTransition? selectedTransition)
+    {
         if (isExportSelecting)
         {
-            position = DrawShortcutHint(position, "左ドラッグ", "範囲作成・調整");
-            position = DrawHelpSeparator(position);
-            position = DrawShortcutHint(position, "Enter", "撮影");
-            position = DrawHelpSeparator(position);
-            position = DrawShortcutHint(position, "Alt", "吸着なし");
-            position = DrawHelpSeparator(position);
-            DrawShortcutHint(position, "右クリック/Esc", "キャンセル");
-            return;
+            return
+            [
+                new HelpPage
+                (
+                    [
+                        new HelpHint("左ドラッグ", "範囲作成・調整"),
+                        new HelpHint("Enter", "撮影"),
+                        new HelpHint("Alt", "吸着なし"),
+                        new HelpHint("右クリック/Esc", "キャンセル")
+                    ]
+                ),
+                new HelpPage
+                (
+                    [
+                        new HelpHint("Ctrl+P", "PNG出力開始"),
+                        new HelpHint("0-9", "テーマ"),
+                        new HelpHint("空白", "表示移動")
+                    ]
+                )
+            ];
+        }
+
+        if (isEditingLabel)
+        {
+            return
+            [
+                new HelpPage
+                (
+                    [
+                        new HelpHint("Enter", "確定"),
+                        new HelpHint("Esc", "キャンセル"),
+                        new HelpHint("Backspace", "1文字削除")
+                    ]
+                )
+            ];
         }
 
         if (selectedTransition is not null)
         {
-            position = DrawShortcutHint(position, "F2・Enter", "ラベル編集");
-            position = DrawHelpSeparator(position);
-            position = DrawShortcutHint(position, "Tab", "ラベル左右切替");
-            position = DrawHelpSeparator(position);
-            DrawShortcutHint(position, "Delete", "遷移削除");
-            return;
+            return
+            [
+                new HelpPage
+                (
+                    [
+                        new HelpHint("F2・Enter", "ラベル編集"),
+                        new HelpHint("Tab", "ラベル左右切替"),
+                        new HelpHint("Delete", "遷移削除")
+                    ]
+                ),
+                new HelpPage
+                (
+                    [
+                        new HelpHint("Shift+ドラッグ", "遷移作成"),
+                        new HelpHint("Shift+同一状態", "自己ループ"),
+                        new HelpHint("Ctrl+S", "保存")
+                    ]
+                ),
+                new HelpPage
+                (
+                    [
+                        new HelpHint("Ctrl+O", "読込"),
+                        new HelpHint("Ctrl+P", "PNG出力"),
+                        new HelpHint("0-9", "テーマ")
+                    ]
+                )
+            ];
         }
 
         if (selectedNode is not null)
         {
-            position = DrawShortcutHint(position, "F2・Enter", "ラベル編集");
-            position = DrawHelpSeparator(position);
-            position = DrawShortcutHint(position, "T", "状態種別変更");
-            position = DrawHelpSeparator(position);
-            position = DrawShortcutHint(position, "C", "状態色変更");
-            position = DrawHelpSeparator(position);
-            DrawShortcutHint(position, "Delete", "状態削除");
-            return;
+            return
+            [
+                new HelpPage
+                (
+                    [
+                        new HelpHint("F2・Enter", "ラベル編集"),
+                        new HelpHint("T", "状態種別変更"),
+                        new HelpHint("C", "状態色変更"),
+                        new HelpHint("Delete", "状態削除")
+                    ]
+                ),
+                new HelpPage
+                (
+                    [
+                        new HelpHint("N", "状態追加"),
+                        new HelpHint("Ctrl+N", "新規作成"),
+                        new HelpHint("Ctrl+S", "保存")
+                    ]
+                ),
+                new HelpPage
+                (
+                    [
+                        new HelpHint("Ctrl+O", "読込"),
+                        new HelpHint("Ctrl+P", "PNG出力"),
+                        new HelpHint("0-9", "テーマ")
+                    ]
+                )
+            ];
         }
 
-        position = DrawShortcutHint(position, "Ctrl+P", "画像保存");
-        position = DrawHelpSeparator(position);
-        position = DrawShortcutHint(position, "Alt", "吸着なし");
-        position = DrawHelpSeparator(position);
-        position = DrawShortcutHint(position, "0-9", "テーマ");
-        position = DrawHelpSeparator(position);
-        DrawShortcutHint(position, "空白", "表示移動");
+        return
+        [
+            new HelpPage
+            (
+                [
+                    new HelpHint("N", "状態追加"),
+                    new HelpHint("Ctrl+N", "新規作成"),
+                    new HelpHint("Ctrl+S", "保存")
+                ]
+            ),
+            new HelpPage
+            (
+                [
+                    new HelpHint("Ctrl+Shift+S", "名前を付けて保存"),
+                    new HelpHint("Ctrl+O", "読込"),
+                    new HelpHint("R", "サンプル図に戻す")
+                ]
+            ),
+            new HelpPage
+            (
+                [
+                    new HelpHint("F2・Enter", "ラベル編集"),
+                    new HelpHint("T", "状態種別変更"),
+                    new HelpHint("C", "状態色変更"),
+                    new HelpHint("Delete", "削除")
+                ]
+            ),
+            new HelpPage
+            (
+                [
+                    new HelpHint("Shift+ドラッグ", "遷移作成"),
+                    new HelpHint("Shift+同一状態", "自己ループ"),
+                    new HelpHint("Tab", "ラベル左右切替")
+                ]
+            ),
+            new HelpPage
+            (
+                [
+                    new HelpHint("Ctrl+P", "PNG出力"),
+                    new HelpHint("0-9", "テーマ"),
+                    new HelpHint("空白", "表示移動")
+                ]
+            )
+        ];
     }
 
     /// <summary>
