@@ -1,10 +1,16 @@
 # YukaiLarkStateTransitionDiagram
 
-YukaiLarkStateTransitionDiagram は、状態と遷移を画面上に並べて、AI エージェントとの相談に使いやすい状態遷移図を作るための無料オープンソースアプリです。
+これは、AI エージェントにアプリケーションの作成をお願いすることになったときに、説明を上手く伝えることを助けるためのツールです。  
 
-<img src="YukaiLarkStateTransitionDiagram/Docs/images/icon-thumbnail-128.png" alt="YukaiLarkStateTransitionDiagram のアプリアイコン" width="96">
+人間の頭の中の、アプリケーションはこういうふうに動作してほしい、という考えを、  
+このアプリケーション上で整理して、図として出力するツールです。  
 
-![サンプル状態遷移図の画面例](YukaiLarkStateTransitionDiagram/Docs/images/screenshot-sample.png)
+状態を円で描き、円を矢印でつなぐことができます。  
+
+<img src="YukaiLarkStateTransitionDiagram/Assets\BrandLogo/yukai-lark-app-icon.png" alt="ユカイラーク" width="96"></img>  
+👆　ユカイラークという鳥のアシスタントが、ツールの使い方を説明します。  
+
+![サンプル状態遷移図の画面例](YukaiLarkStateTransitionDiagram/Docs/images/screenshot-sample.png)  
 
 ## できること
 
@@ -14,7 +20,6 @@ YukaiLarkStateTransitionDiagram は、状態と遷移を画面上に並べて、
 - 遷移ラベル、矢印の曲がり方、接点位置を調整できます。
 - 状態遷移図を JSON として保存・読込できます。
 - 図を PNG 画像として出力できます。
-- ユカイラークという鳥のアシスタントが、次に作れそうな部品を提案します。
 
 ## こんな人向け
 

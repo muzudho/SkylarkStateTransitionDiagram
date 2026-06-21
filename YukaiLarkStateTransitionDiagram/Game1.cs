@@ -160,7 +160,7 @@ public class Game1 : Game
         else
         {
             _imeCompositionLabel = string.Empty;
-            if (keyboard.IsKeyDown(Keys.Escape) || GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed)
+            if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed)
             {
                 Exit();
             }
