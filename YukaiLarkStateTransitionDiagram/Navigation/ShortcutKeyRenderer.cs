@@ -204,7 +204,8 @@ public sealed class ShortcutKeyRenderer : IDisposable
                     [
                         new HelpHint("Shift+ドラッグ", "遷移作成"),
                         new HelpHint("Shift+同一状態", "自己ループ"),
-                        new HelpHint("Ctrl+S", "保存")
+                        new HelpHint("Ctrl+S", "保存"),
+                        new HelpHint("Ctrl+Z/Y", "元に戻す/やり直し")
                     ]
                 ),
                 new HelpPage
@@ -243,7 +244,8 @@ public sealed class ShortcutKeyRenderer : IDisposable
                     [
                         new HelpHint("N", "状態追加"),
                         new HelpHint("Ctrl+N", "新規作成"),
-                        new HelpHint("Ctrl+S", "保存")
+                        new HelpHint("Ctrl+S", "保存"),
+                        new HelpHint("Ctrl+Z/Y", "元に戻す/やり直し")
                     ]
                 ),
                 new HelpPage
@@ -264,7 +266,8 @@ public sealed class ShortcutKeyRenderer : IDisposable
                 [
                     new HelpHint("N", "状態追加"),
                     new HelpHint("Ctrl+N", "新規作成"),
-                    new HelpHint("Ctrl+S", "保存")
+                    new HelpHint("Ctrl+S", "保存"),
+                    new HelpHint("Ctrl+Z/Y", "元に戻す/やり直し")
                 ]
             ),
             new HelpPage
