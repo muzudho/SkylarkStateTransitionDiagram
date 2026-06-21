@@ -212,6 +212,8 @@ public class Game1 : Game
     private YukaiLarkAssistantContext CreateAssistantContext()
         => new(
             _nodes.Any(node => node.Kind == NodeKind.Start),
+            _nodes.Count,
+            _transitions.Count,
             !IsEditingLabel
                 && !_isExportSelecting
                 && !_isPanning
@@ -284,9 +286,9 @@ public class Game1 : Game
             ApplyKeyCapTheme(themeIndex);
             return;
         }
-        if (_yukaiLarkAssistant.ShouldCreateStartNodeFromKeyboard(CreateAssistantContext(), keyboard, _previousKeyboard))
+        if (_yukaiLarkAssistant.ShouldRunFromKeyboard(CreateAssistantContext(), keyboard, _previousKeyboard, out var assistKind))
         {
-            CreateStartNodeWithAssist();
+            RunYukaiLarkAssist(assistKind);
             return;
         }
         if (IsNewKeyPress(keyboard, Keys.F2) || IsNewKeyPress(keyboard, Keys.Enter))
@@ -951,9 +953,9 @@ public class Game1 : Game
         var snapNodes = !IsAltDown(keyboard);
         if (leftPressed)
         {
-            if (_yukaiLarkAssistant.ShouldCreateStartNodeFromMouse(CreateAssistantContext(), mouse.Position))
+            if (_yukaiLarkAssistant.ShouldRunFromMouse(CreateAssistantContext(), mouse.Position, out var assistKind))
             {
-                CreateStartNodeWithAssist();
+                RunYukaiLarkAssist(assistKind);
                 return;
             }
 
@@ -1098,10 +1100,25 @@ public class Game1 : Game
         });
         _status = "状態を追加しました。F2・Enterでラベルを編集できます。";
     }
+    private void RunYukaiLarkAssist(YukaiLarkAssistKind kind)
+    {
+        switch (kind)
+        {
+            case YukaiLarkAssistKind.CreateStartNode:
+                CreateStartNodeWithAssist();
+                break;
+            case YukaiLarkAssistKind.CreateStateNode:
+                CreateStateNodeWithAssist();
+                break;
+            case YukaiLarkAssistKind.CreateTransition:
+                CreateTransitionWithAssist();
+                break;
+        }
+    }
     private void CreateStartNodeWithAssist()
     {
         var viewport = GraphicsDevice.Viewport;
-        var screenPosition = new Vector2(viewport.Width * 0.42f, viewport.Height * 0.45f);
+        var screenPosition = _yukaiLarkAssistant.GetNodeScreenPosition(viewport, YukaiLarkAssistKind.CreateStartNode);
         var worldPosition = ScreenToWorld(screenPosition);
         ExecuteUndoableChange(() =>
         {
@@ -1120,6 +1137,49 @@ public class Game1 : Game
         });
         _yukaiLarkAssistant.Reset();
         _status = "開始ノードを作成しました。次はNで状態追加、Shift+ドラッグで遷移作成。";
+    }
+    private void CreateStateNodeWithAssist()
+    {
+        var viewport = GraphicsDevice.Viewport;
+        var screenPosition = _yukaiLarkAssistant.GetNodeScreenPosition(viewport, YukaiLarkAssistKind.CreateStateNode);
+        var worldPosition = ScreenToWorld(screenPosition);
+        ExecuteUndoableChange(() =>
+        {
+            var node = new DiagramNode
+            {
+                Id = _nextNodeId++,
+                Label = $"状態{_nextNodeId - 1}",
+                Position = SnapToHalfGrid(worldPosition),
+                RadiusUnits = DiagramNode.DefaultRadiusUnits,
+                ColorIndex = (_nextNodeId - 2) % Palette.Length
+            };
+            _nodes.Add(node);
+            _selectedNode = node;
+            _selectedTransition = null;
+        });
+        _yukaiLarkAssistant.Reset();
+        _status = "状態ノードを作成しました。次は開始ノードから遷移をつなげます。";
+    }
+
+    private void CreateTransitionWithAssist()
+    {
+        var source = _nodes.FirstOrDefault(node => node.Kind == NodeKind.Start);
+        var target = _nodes.FirstOrDefault(node => node.Kind != NodeKind.Start);
+        if (source is null || target is null)
+        {
+            _status = "遷移を作るには開始ノードと次の状態が必要です。";
+            return;
+        }
+
+        var before = _transitions.Count;
+        AddTransition(source.Id, target.Id);
+        if (_transitions.Count > before)
+        {
+            _selectedNode = null;
+            _selectedTransition = _transitions.LastOrDefault();
+            _yukaiLarkAssistant.Reset();
+            _status = "開始から次の状態へ遷移を作成しました。F2・Enterでラベル編集できます。";
+        }
     }
     private void AddTransition(int sourceId, int targetId)
     {
@@ -2219,4 +2279,6 @@ public static class PrimitiveText
         }
     }
 }
+
+
 

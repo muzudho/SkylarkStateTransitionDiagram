@@ -7,50 +7,60 @@ using Microsoft.Xna.Framework.Input;
 
 internal sealed class YukaiLarkAssistant
 {
-    /// <summary>
-    /// ［開始ノード作成アシスト］が起動するまでの秒数
-    /// </summary>
-    private const double StartNodeAssistWakeSeconds = 1.2;
-
+    private const double AssistWakeSeconds = 1.2;
     private const int MascotTargetWidth = 176;
 
-    private double _startNodeAssistSeconds;
+    private double _assistSeconds;
+    private YukaiLarkAssistKind _activeKind;
 
     public Rectangle MascotBounds { get; private set; }
 
-    private bool IsStartNodeAssistReady => _startNodeAssistSeconds >= StartNodeAssistWakeSeconds;
+    private bool IsAssistReady => _assistSeconds >= AssistWakeSeconds;
 
     public string Update(GameTime gameTime, YukaiLarkAssistantContext context, string currentStatus, string defaultStatus)
     {
-        if (!ShouldOfferStartNodeAssist(context))
+        var nextKind = GetAssistKind(context);
+        if (nextKind == YukaiLarkAssistKind.None)
         {
-            _startNodeAssistSeconds = 0;
+            Reset();
             return currentStatus;
         }
 
-        _startNodeAssistSeconds += gameTime.ElapsedGameTime.TotalSeconds;
-        return IsStartNodeAssistReady && currentStatus == defaultStatus
-            ? "ユカイラーク: まず開始ノードを作れます。Enterか鳥をクリック。"
+        if (nextKind != _activeKind)
+        {
+            _activeKind = nextKind;
+            _assistSeconds = 0;
+        }
+
+        _assistSeconds += gameTime.ElapsedGameTime.TotalSeconds;
+        return IsAssistReady && (currentStatus == defaultStatus || IsAssistantStatus(currentStatus))
+            ? GetStatusText(nextKind)
             : currentStatus;
     }
 
-    public bool ShouldCreateStartNodeFromKeyboard(YukaiLarkAssistantContext context, KeyboardState keyboard, KeyboardState previousKeyboard)
-        => IsStartNodeAssistReady
-            && ShouldOfferStartNodeAssist(context)
+    public bool ShouldRunFromKeyboard(YukaiLarkAssistantContext context, KeyboardState keyboard, KeyboardState previousKeyboard, out YukaiLarkAssistKind kind)
+    {
+        kind = GetRunnableAssistKind(context);
+        return kind != YukaiLarkAssistKind.None
             && keyboard.IsKeyDown(Keys.Enter)
             && !previousKeyboard.IsKeyDown(Keys.Enter);
+    }
 
-    public bool ShouldCreateStartNodeFromMouse(YukaiLarkAssistantContext context, Point mousePosition)
-        => IsStartNodeAssistReady
-            && ShouldOfferStartNodeAssist(context)
-            && MascotBounds.Contains(mousePosition);
+    public bool ShouldRunFromMouse(YukaiLarkAssistantContext context, Point mousePosition, out YukaiLarkAssistKind kind)
+    {
+        kind = GetRunnableAssistKind(context);
+        return kind != YukaiLarkAssistKind.None && MascotBounds.Contains(mousePosition);
+    }
 
-    public Vector2 GetStartNodeScreenPosition(Viewport viewport)
-        => new(viewport.Width * 0.42f, viewport.Height * 0.45f);
+    public Vector2 GetNodeScreenPosition(Viewport viewport, YukaiLarkAssistKind kind)
+        => kind == YukaiLarkAssistKind.CreateStateNode
+            ? new Vector2(viewport.Width * 0.58f, viewport.Height * 0.45f)
+            : new Vector2(viewport.Width * 0.42f, viewport.Height * 0.45f);
 
     public void Reset()
     {
-        _startNodeAssistSeconds = 0;
+        _assistSeconds = 0;
+        _activeKind = YukaiLarkAssistKind.None;
     }
 
     public void Draw(
@@ -69,44 +79,103 @@ internal sealed class YukaiLarkAssistant
             return;
         }
 
+        var assistKind = GetAssistKind(context);
         var source = new Rectangle(0, 0, mascotTexture.Width, (int)(mascotTexture.Height * 0.66f));
         var targetHeight = (int)MathF.Round(MascotTargetWidth * source.Height / (float)source.Width);
-        var bob = ShouldOfferStartNodeAssist(context)
+        var bob = assistKind != YukaiLarkAssistKind.None
             ? MathF.Sin((float)totalGameTime.TotalSeconds * 8.5f) * 8f
             : 0f;
         var target = new Rectangle(viewport.Width - MascotTargetWidth - 22, 178 + (int)MathF.Round(bob), MascotTargetWidth, targetHeight);
         MascotBounds = target;
         spriteBatch.Draw(mascotTexture, target, source, Color.White * 0.92f);
 
-        if (IsStartNodeAssistReady)
+        if (IsAssistReady && assistKind != YukaiLarkAssistKind.None)
         {
-            DrawStartNodeAssistBubble(spriteBatch, pixel, target, drawRectangleOutline, drawUiText);
+            DrawAssistBubble(spriteBatch, pixel, target, assistKind, drawRectangleOutline, drawUiText);
         }
     }
 
-    private static bool ShouldOfferStartNodeAssist(YukaiLarkAssistantContext context)
-        => !context.HasStartNode && context.IsInteractionIdle;
+    private YukaiLarkAssistKind GetRunnableAssistKind(YukaiLarkAssistantContext context)
+    {
+        var kind = GetAssistKind(context);
+        return IsAssistReady ? kind : YukaiLarkAssistKind.None;
+    }
 
-    private static void DrawStartNodeAssistBubble(
+    private static YukaiLarkAssistKind GetAssistKind(YukaiLarkAssistantContext context)
+    {
+        if (!context.IsInteractionIdle)
+        {
+            return YukaiLarkAssistKind.None;
+        }
+
+        if (!context.HasStartNode)
+        {
+            return YukaiLarkAssistKind.CreateStartNode;
+        }
+
+        if (context.NodeCount == 1)
+        {
+            return YukaiLarkAssistKind.CreateStateNode;
+        }
+
+        if (context.NodeCount >= 2 && context.TransitionCount == 0)
+        {
+            return YukaiLarkAssistKind.CreateTransition;
+        }
+
+        return YukaiLarkAssistKind.None;
+    }
+
+    private static bool IsAssistantStatus(string status)
+        => status.StartsWith("ユカイラーク:", StringComparison.Ordinal);
+
+    private static string GetStatusText(YukaiLarkAssistKind kind)
+        => kind switch
+        {
+            YukaiLarkAssistKind.CreateStartNode => "ユカイラーク: まず開始ノードを作れます。Enterか鳥をクリック。",
+            YukaiLarkAssistKind.CreateStateNode => "ユカイラーク: 次の状態ノードを作れます。Enterか鳥をクリック。",
+            YukaiLarkAssistKind.CreateTransition => "ユカイラーク: 開始から次の状態へ遷移を作れます。Enterか鳥をクリック。",
+            _ => string.Empty
+        };
+
+    private static void DrawAssistBubble(
         SpriteBatch spriteBatch,
         Texture2D pixel,
         Rectangle mascotBounds,
+        YukaiLarkAssistKind kind,
         DrawRectangleOutline drawRectangleOutline,
         DrawUiText drawUiText)
     {
-        const int bubbleWidth = 318;
+        const int bubbleWidth = 338;
         const int bubbleHeight = 72;
         var bubble = new Rectangle(mascotBounds.X - bubbleWidth + 18, mascotBounds.Y + 22, bubbleWidth, bubbleHeight);
+        var (title, body) = GetBubbleText(kind);
         spriteBatch.Draw(pixel, bubble, new Color(255, 253, 239, 235));
         drawRectangleOutline(bubble, new Color(83, 178, 176, 210), 2);
-        drawUiText("開始ノードを作る？", new Vector2(bubble.X + 12, bubble.Y + 10), new Color(58, 45, 34), 17, true);
-        drawUiText("Enter または鳥をクリック", new Vector2(bubble.X + 12, bubble.Y + 38), new Color(74, 86, 92), 15, false);
+        drawUiText(title, new Vector2(bubble.X + 12, bubble.Y + 10), new Color(58, 45, 34), 17, true);
+        drawUiText(body, new Vector2(bubble.X + 12, bubble.Y + 38), new Color(74, 86, 92), 15, false);
     }
+
+    private static (string Title, string Body) GetBubbleText(YukaiLarkAssistKind kind)
+        => kind switch
+        {
+            YukaiLarkAssistKind.CreateStartNode => ("開始ノードを作る？", "Enter または鳥をクリック"),
+            YukaiLarkAssistKind.CreateStateNode => ("次の状態を作る？", "Enter または鳥をクリック"),
+            YukaiLarkAssistKind.CreateTransition => ("遷移をつなぐ？", "Enter または鳥をクリック"),
+            _ => (string.Empty, string.Empty)
+        };
 }
 
-internal readonly record struct YukaiLarkAssistantContext(bool HasStartNode, bool IsInteractionIdle);
+internal readonly record struct YukaiLarkAssistantContext(bool HasStartNode, int NodeCount, int TransitionCount, bool IsInteractionIdle);
+
+internal enum YukaiLarkAssistKind
+{
+    None,
+    CreateStartNode,
+    CreateStateNode,
+    CreateTransition
+}
 
 internal delegate void DrawRectangleOutline(Rectangle rectangle, Color color, int thickness);
 
 internal delegate float DrawUiText(string text, Vector2 position, Color color, float size, bool bold);
-
