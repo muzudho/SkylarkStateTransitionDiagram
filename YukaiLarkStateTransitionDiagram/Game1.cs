@@ -69,6 +69,7 @@ public class Game1 : Game
     private readonly List<DiagramTransition> _transitions = new();
     private readonly Dictionary<string, Texture2D> _labelTextureCache = new();
     private readonly Dictionary<string, Texture2D> _uiTextTextureCache = new();
+    private NodeRenderer _nodeRenderer = null!;
     private IKeyCapTheme _keyCapTheme = KeyCapThemes.Current;
     private BoardTheme _boardTheme = BoardThemes.ForKeyCapTheme(KeyCapThemes.Current);
     private SpriteBatch _spriteBatch = null!;
@@ -125,6 +126,7 @@ public class Game1 : Game
         _spriteBatch = new SpriteBatch(GraphicsDevice);
         _pixel = new Texture2D(GraphicsDevice, 1, 1);
         _pixel.SetData(new[] { Color.White });
+        _nodeRenderer = new NodeRenderer(_spriteBatch, Palette, GetLabelTexture, DrawCircle, DrawCircleOutline, DrawLine, DrawHandle);
     }
     protected override void Update(GameTime gameTime)
     {
@@ -1347,11 +1349,11 @@ public class Game1 : Game
         }
         foreach (var node in _nodes)
         {
-            DrawNode(node, includeInteraction && node == _selectedNode);
+            _nodeRenderer.DrawNode(node, includeInteraction && node == _selectedNode, _editingNode, _editingLabel);
         }
         if (includeInteraction && _selectedNode is not null)
         {
-            DrawNodeResizeHandle(_selectedNode);
+            _nodeRenderer.DrawNodeResizeHandle(_selectedNode);
         }
         if (includeInteraction && _selectedTransition is not null)
         {
@@ -1582,42 +1584,6 @@ public class Game1 : Game
 
     private string GetFileSummary()
         => _currentFilePath is null ? "保存先: 未指定" : $"保存先: {Path.GetFileName(_currentFilePath)}";
-    private void DrawNode(DiagramNode node, bool selected)
-    {
-        var fill = node.Kind == NodeKind.Normal ? Palette[node.ColorIndex % Palette.Length] : new Color(5, 6, 8);
-        DrawCircle(node.Position, node.Radius + 4, selected ? new Color(255, 255, 255) : new Color(10, 12, 16));
-        DrawCircle(node.Position, node.Radius, fill);
-
-        if (node.Kind == NodeKind.Normal)
-        {
-            DrawCircleOutline(node.Position, node.Radius, new Color(15, 18, 24), 3f);
-        }
-        else
-        {
-            DrawCircleOutline(node.Position, node.Radius, Color.White, node.Kind == NodeKind.Start ? 4f : 3f);
-            if (node.Kind == NodeKind.End)
-            {
-                DrawCircleOutline(node.Position, node.Radius - 10f, Color.White, 3f);
-            }
-        }
-
-        var label = node == _editingNode ? _editingLabel + "_" : node.Label;
-        DrawNodeLabel(label, node.Position, node == _editingNode);
-    }
-
-    private void DrawNodeResizeHandle(DiagramNode node)
-    {
-        var center = GetNodeResizeHandleCenter(node);
-        DrawLine(node.Position + new Vector2(node.Radius * 0.72f, node.Radius * 0.72f), center, new Color(255, 230, 120), 2f);
-        DrawHandle(center, new Color(255, 230, 120));
-    }
-
-    private void DrawNodeLabel(string label, Vector2 center, bool editing)
-    {
-        var texture = GetLabelTexture(label, editing);
-        var position = center - new Vector2(texture.Width / 2f, texture.Height / 2f);
-        _spriteBatch.Draw(texture, position, Color.White);
-    }
     private float DrawUiText(string text, Vector2 position, Color color, float size, bool bold)
     {
         var texture = GetUiTextTexture(text, size, bold);
