@@ -1,5 +1,6 @@
 namespace YukaiLarkStateTransitionDiagram;
 using YukaiLarkStateTransitionDiagram.Theme;
+using YukaiLarkStateTransitionDiagram.Navigation;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -60,6 +61,7 @@ public class Game1 : Game
     private PrimitiveRenderer _primitiveRenderer = null!;
     private EdgeRenderer _edgeRenderer = null!;
     private NodeRenderer _nodeRenderer = null!;
+    private ShortcutKeyRenderer _shortcutKeyRenderer = null!;
     private IKeyCapTheme _keyCapTheme = KeyCapThemes.Current;
     private BoardTheme _boardTheme = BoardThemes.ForKeyCapTheme(KeyCapThemes.Current);
     private SpriteBatch _spriteBatch = null!;
@@ -118,6 +120,7 @@ public class Game1 : Game
         _pixel.SetData(new[] { Color.White });
         _primitiveRenderer = new PrimitiveRenderer(_spriteBatch, _pixel);
         _edgeRenderer = new EdgeRenderer(_primitiveRenderer, _spriteBatch, GetLabelTexture, _boardTheme);
+        _shortcutKeyRenderer = new ShortcutKeyRenderer(GraphicsDevice, _spriteBatch, _pixel, _keyCapTheme);
         _nodeRenderer = new NodeRenderer(_primitiveRenderer, _spriteBatch, Palette, GetLabelTexture);
     }
     protected override void Update(GameTime gameTime)
@@ -157,7 +160,7 @@ public class Game1 : Game
         _spriteBatch.Begin(samplerState: SamplerState.LinearClamp);
         DrawToolbar();
         DrawInspectorPanel();
-        DrawBottomHelp();
+        _shortcutKeyRenderer.DrawBottomHelp(GraphicsDevice.Viewport, _isExportSelecting, _selectedNode, _selectedTransition);
         DrawExportSelectionOverlay();
         _spriteBatch.End();
         base.Draw(gameTime);
@@ -174,6 +177,7 @@ public class Game1 : Game
             texture.Dispose();
         }
         _uiTextTextureCache.Clear();
+        _shortcutKeyRenderer?.Dispose();
         base.UnloadContent();
     }
     private bool IsEditingLabel => _editingNode is not null || _editingTransition is not null;
@@ -297,6 +301,7 @@ public class Game1 : Game
         _keyCapTheme = KeyCapThemes.ShortcutThemes[themeIndex];
         _boardTheme = BoardThemes.ForKeyCapTheme(_keyCapTheme);
         _edgeRenderer.Theme = _boardTheme;
+        _shortcutKeyRenderer.KeyCapTheme = _keyCapTheme;
         _status = $"テーマを {themeIndex}: {_keyCapTheme.Name} に切り替えました。背景とPNG出力にも反映します。";
     }
 
@@ -1531,74 +1536,6 @@ public class Game1 : Game
         DrawUiText(GetFileSummary(), new Vector2(x + 12, bounds.Y + 62), new Color(170, 184, 202), 14, false);
     }
 
-    private void DrawBottomHelp()
-    {
-        var viewport = GraphicsDevice.Viewport;
-        if (viewport.Height < 360)
-        {
-            return;
-        }
-
-        var y = viewport.Height - 34;
-        _spriteBatch.Draw(_pixel, new Rectangle(0, y, viewport.Width, 34), new Color(17, 19, 23, 210));
-
-        var position = new Vector2(12, y + 6);
-        if (_isExportSelecting)
-        {
-            position = DrawShortcutHint(position, "左ドラッグ", "範囲作成・調整");
-            position = DrawHelpSeparator(position);
-            position = DrawShortcutHint(position, "Enter", "撮影");
-            position = DrawHelpSeparator(position);
-            position = DrawShortcutHint(position, "Alt", "吸着なし");
-            position = DrawHelpSeparator(position);
-            position = DrawShortcutHint(position, "右クリック/Esc", "キャンセル");
-            return;
-        }
-
-        if (_selectedTransition is not null)
-        {
-            position = DrawShortcutHint(position, "F2・Enter", "ラベル編集");
-            position = DrawHelpSeparator(position);
-            position = DrawShortcutHint(position, "Tab", "ラベル左右切替");
-            position = DrawHelpSeparator(position);
-            DrawShortcutHint(position, "Delete", "遷移削除");
-            return;
-        }
-
-        if (_selectedNode is not null)
-        {
-            position = DrawShortcutHint(position, "F2・Enter", "ラベル編集");
-            position = DrawHelpSeparator(position);
-            position = DrawShortcutHint(position, "T", "状態種別変更");
-            position = DrawHelpSeparator(position);
-            position = DrawShortcutHint(position, "C", "状態色変更");
-            position = DrawHelpSeparator(position);
-            DrawShortcutHint(position, "Delete", "状態削除");
-            return;
-        }
-
-        position = DrawShortcutHint(position, "Ctrl+P", "画像保存");
-        position = DrawHelpSeparator(position);
-        position = DrawShortcutHint(position, "Alt", "吸着なし");
-        position = DrawHelpSeparator(position);
-        position = DrawShortcutHint(position, "0-9", "テーマ");
-        position = DrawHelpSeparator(position);
-        DrawShortcutHint(position, "空白", "表示移動");
-    }
-
-    private Vector2 DrawShortcutHint(Vector2 position, string key, string description)
-    {
-        var x = DrawKeyCap(key, position);
-        x = DrawUiText(description, new Vector2(x + 6, position.Y + 3), _keyCapTheme.DescriptionTextColor, 14, false);
-        return new Vector2(x + 12, position.Y);
-    }
-
-    private Vector2 DrawHelpSeparator(Vector2 position)
-    {
-        var x = DrawUiText("/", new Vector2(position.X, position.Y + 3), _keyCapTheme.SeparatorTextColor, 14, false);
-        return new Vector2(x + 12, position.Y);
-    }
-
     private string GetSelectionSummary()
     {
         if (_selectedNode is not null)
@@ -1627,27 +1564,6 @@ public class Game1 : Game
         var texture = GetUiTextTexture(text, size, bold);
         _spriteBatch.Draw(texture, position, color);
         return position.X + texture.Width;
-    }
-
-    private float DrawKeyCap(string text, Vector2 position)
-    {
-        var textTexture = GetUiTextTexture(text, _keyCapTheme.FontSize, true);
-        var width = Math.Max(_keyCapTheme.MinWidth, textTexture.Width + (_keyCapTheme.HorizontalPadding * 2));
-        var height = _keyCapTheme.Height;
-        var bounds = new Rectangle((int)position.X, (int)position.Y, width, height);
-
-        _spriteBatch.Draw(_pixel, bounds, _keyCapTheme.FaceColor);
-        _spriteBatch.Draw(_pixel, new Rectangle(bounds.X, bounds.Y, bounds.Width, 1), _keyCapTheme.TopEdgeColor);
-        _spriteBatch.Draw(_pixel, new Rectangle(bounds.X, bounds.Y, 1, bounds.Height), _keyCapTheme.TopEdgeColor);
-        _spriteBatch.Draw(_pixel, new Rectangle(bounds.X, bounds.Bottom - 2, bounds.Width, 2), _keyCapTheme.BottomEdgeColor);
-        _spriteBatch.Draw(_pixel, new Rectangle(bounds.Right - 1, bounds.Y, 1, bounds.Height), _keyCapTheme.BottomEdgeColor);
-        _spriteBatch.Draw(_pixel, new Rectangle(bounds.X + 2, bounds.Y + 2, bounds.Width - 4, 1), _keyCapTheme.InnerHighlightColor);
-
-        var textPosition = new Vector2(
-            bounds.X + (bounds.Width - textTexture.Width) / 2f,
-            bounds.Y + (bounds.Height - textTexture.Height) / 2f);
-        _spriteBatch.Draw(textTexture, textPosition, _keyCapTheme.LabelTextColor);
-        return bounds.Right;
     }
 
     private Texture2D GetUiTextTexture(string text, float size, bool bold)
