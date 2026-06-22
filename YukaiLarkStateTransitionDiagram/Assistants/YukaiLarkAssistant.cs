@@ -255,6 +255,7 @@ internal sealed class YukaiLarkAssistant
         => kind switch
         {
             YukaiLarkAssistKind.CreateStartMarker => ("ユカイラークが作図しました", "開始マークを追加し、開始マークにして選択しました。", "手動なら Nで状態追加、Tで種別変更です。"),
+            YukaiLarkAssistKind.DeleteStartMarker => ("ユカイラークが気づきました", "開始マークを削除したんですね？", "必要なら Ctrl+Z で元に戻せます。"),
             YukaiLarkAssistKind.CreateStateNode => ("ユカイラークが作図しました", "次の状態ノードを追加し、選択しました。", "手動なら Nで状態追加、ドラッグで位置調整です。"),
             YukaiLarkAssistKind.CreateTransition => ("ユカイラークが作図しました", "開始マークから次の状態へ遷移を作成しました。", "手動なら Shift+ドラッグで状態同士を接続します。"),
             YukaiLarkAssistKind.AddTransitionEvent => ("ユカイラークが見つけました", "イベント未設定の遷移を選択しました。", "イベント名を入力して Enterで確定します。"),
@@ -269,6 +270,7 @@ internal enum YukaiLarkAssistKind
 {
     None,
     CreateStartMarker,
+    DeleteStartMarker,
     CreateStateNode,
     CreateTransition,
     AddTransitionEvent,

@@ -1495,7 +1495,16 @@ public class Game1 : Game
                 _nodes.Remove(node);
                 _transitions.RemoveAll(t => t.SourceId == id || t.TargetId == id);
             });
-            _status = "選択中の状態を削除しました。";
+            _status = node.Kind switch
+            {
+                NodeKind.StartMarker => "ユカイラーク: 開始マークを削除したんですね？",
+                NodeKind.EndMarker => "選択中の終了マークを削除しました。",
+                _ => "選択中の状態を削除しました。"
+            };
+            if (node.Kind == NodeKind.StartMarker)
+            {
+                _yukaiLarkAssistant.NotifyAssistCompleted(YukaiLarkAssistKind.DeleteStartMarker);
+            }
             _selectedNode = null;
             return;
         }
