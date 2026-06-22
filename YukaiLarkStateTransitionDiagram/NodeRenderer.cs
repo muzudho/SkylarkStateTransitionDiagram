@@ -47,12 +47,12 @@ public sealed class NodeRenderer
         {
             _primitiveRenderer.DrawCircleOutline(node.Position, node.Radius, new Color(15, 18, 24), 3f);
         }
-        // 開始ノード
-        else if (node.Kind == NodeKind.Start)
+        // 開始マーク
+        else if (node.Kind == NodeKind.StartMarker)
         {
             _primitiveRenderer.DrawCircleOutline(node.Position, node.Radius - 1f, Color.White, 5f);
         }
-        // 終了ノード
+        // 終了マーク
         else
         {
             _primitiveRenderer.DrawCircleOutline(node.Position, node.Radius - 2f, Color.White, 2f);
@@ -64,11 +64,11 @@ public sealed class NodeRenderer
     }
 
     /// <summary>
-    /// 作成前の開始ノードを薄く描画します。
+    /// 作成前の開始マークを薄く描画します。
     /// </summary>
     /// <param name="node">描画する仮ノード</param>
     /// <param name="opacity">不透明度</param>
-    public void DrawStartNodeGhost(DiagramNode node, float opacity)
+    public void DrawStartMarkerGhost(DiagramNode node, float opacity)
     {
         var alpha = MathHelper.Clamp(opacity, 0f, 1f);
         _primitiveRenderer.DrawCircle(node.Position, node.Radius + 8f, new Color(110, 185, 230) * (alpha * 0.32f));

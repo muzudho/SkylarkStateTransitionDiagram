@@ -155,7 +155,7 @@ public class Game1 : Game
             return;
         }
 
-        // ［開始ノード作成アシスト］の起動判定
+        // ［開始マーク作成アシスト］の起動判定
         _status = _yukaiLarkAssistant.Update(gameTime, CreateAssistantContext(), _status, DefaultStatus);
 
         if (_isExportSelecting)
@@ -193,7 +193,7 @@ public class Game1 : Game
         _spriteBatch.Begin(samplerState: SamplerState.LinearClamp);
         _headerRenderer.DrawHeader(GraphicsDevice.Viewport, GetHeaderTitle(), _status, _boardTheme);
 
-        // ［開始ノード作成アシスト］の描画
+        // ［開始マーク作成アシスト］の描画
         DrawYukaiLarkMascot(GraphicsDevice.Viewport, gameTime.TotalGameTime);
 
         DrawInspectorPanel();
@@ -235,8 +235,8 @@ public class Game1 : Game
     {
         var missingTransitionEventSummary = GetMissingTransitionEventSummary();
         return new YukaiLarkAssistantContext(
-            _nodes.Any(node => node.Kind == NodeKind.Start),
-            _nodes.Any(node => node.Kind == NodeKind.End),
+            _nodes.Any(node => node.Kind == NodeKind.StartMarker),
+            _nodes.Any(node => node.Kind == NodeKind.EndMarker),
             _nodes.Count,
             _transitions.Count,
             !string.IsNullOrEmpty(missingTransitionEventSummary),
@@ -404,7 +404,7 @@ public class Game1 : Game
             }
             else
             {
-                _status = "開始・終了ノードは黒固定です。Tで通常ノードに戻せます。";
+                _status = "開始・終了マークは黒固定です。Tで通常ノードに戻せます。";
             }
         }
     }
@@ -1228,19 +1228,19 @@ public class Game1 : Game
         {
             node.Kind = node.Kind switch
             {
-                NodeKind.Normal => NodeKind.Start,
-                NodeKind.Start => NodeKind.End,
+                NodeKind.Normal => NodeKind.StartMarker,
+                NodeKind.StartMarker => NodeKind.EndMarker,
                 _ => NodeKind.Normal
             };
-            node.RadiusUnits = node.Kind is NodeKind.Start or NodeKind.End
+            node.RadiusUnits = node.Kind is NodeKind.StartMarker or NodeKind.EndMarker
                 ? DiagramNode.TerminalRadiusUnits
                 : DiagramNode.DefaultRadiusUnits;
         });
 
         _status = node.Kind switch
         {
-            NodeKind.Start => "選択中の状態を開始ノードにしました。",
-            NodeKind.End => "選択中の状態を終了ノードにしました。",
+            NodeKind.StartMarker => "選択中の部品を開始マークにしました。",
+            NodeKind.EndMarker => "選択中の部品を終了マークにしました。",
             _ => "選択中の状態を通常ノードに戻しました。"
         };
     }
@@ -1953,7 +1953,7 @@ public class Game1 : Game
         }
         if (includeInteraction)
         {
-            DrawStartNodeGhost(totalGameTime);
+            DrawStartMarkerGhost(totalGameTime);
             DrawStateNodeGhost(totalGameTime);
         }
         foreach (var node in _nodes)
@@ -1973,15 +1973,15 @@ public class Game1 : Game
         }
     }
 
-    private void DrawStartNodeGhost(TimeSpan totalGameTime)
+    private void DrawStartMarkerGhost(TimeSpan totalGameTime)
     {
         var context = CreateAssistantContext();
-        if (!_yukaiLarkAssistant.ShouldDrawStartNodeGhost(context))
+        if (!_yukaiLarkAssistant.ShouldDrawStartMarkerGhost(context))
         {
             return;
         }
 
-        var screenPosition = _yukaiLarkAssistant.GetNodeScreenPosition(GraphicsDevice.Viewport, YukaiLarkAssistKind.CreateStartNode);
+        var screenPosition = _yukaiLarkAssistant.GetNodeScreenPosition(GraphicsDevice.Viewport, YukaiLarkAssistKind.CreateStartMarker);
         var worldPosition = SnapToHalfGrid(ScreenToWorld(screenPosition));
         var bob = YukaiLarkAssistant.GetAssistBobOffset(totalGameTime);
         var ghostNode = new DiagramNode
@@ -1990,9 +1990,9 @@ public class Game1 : Game
             Position = worldPosition + new Vector2(0f, bob),
             RadiusUnits = DiagramNode.TerminalRadiusUnits,
             ColorIndex = 0,
-            Kind = NodeKind.Start
+            Kind = NodeKind.StartMarker
         };
-        _nodeRenderer.DrawStartNodeGhost(ghostNode, 1f);
+        _nodeRenderer.DrawStartMarkerGhost(ghostNode, 1f);
     }
 
     private void DrawStateNodeGhost(TimeSpan totalGameTime)
@@ -2026,8 +2026,8 @@ public class Game1 : Game
             return;
         }
 
-        var source = _nodes.FirstOrDefault(node => node.Kind == NodeKind.Start);
-        var target = _nodes.FirstOrDefault(node => node.Kind != NodeKind.Start);
+        var source = _nodes.FirstOrDefault(node => node.Kind == NodeKind.StartMarker);
+        var target = _nodes.FirstOrDefault(node => node.Kind != NodeKind.StartMarker);
         if (source is null || target is null || _transitions.Any(t => t.SourceId == source.Id && t.TargetId == target.Id))
         {
             return;
@@ -2304,13 +2304,12 @@ public class Game1 : Game
     {
         if (_selectedNode is not null)
         {
-            var kind = _selectedNode.Kind switch
+            return _selectedNode.Kind switch
             {
-                NodeKind.Start => "開始",
-                NodeKind.End => "終了",
-                _ => "通常"
+                NodeKind.StartMarker => $"選択: 開始マーク {_selectedNode.Id} / サイズ {_selectedNode.RadiusUnits}",
+                NodeKind.EndMarker => $"選択: 終了マーク {_selectedNode.Id} / サイズ {_selectedNode.RadiusUnits}",
+                _ => $"選択: 状態 {_selectedNode.Id} / 通常 / サイズ {_selectedNode.RadiusUnits}"
             };
-            return $"選択: 状態 {_selectedNode.Id} / {kind} / サイズ {_selectedNode.RadiusUnits}";
         }
 
         if (_selectedTransition is not null)
@@ -2320,7 +2319,6 @@ public class Game1 : Game
 
         return "選択: なし";
     }
-
     private string GetHeaderTitle()
         => _currentFilePath is null ? "未保存のダイアグラム" : Path.GetFileName(_currentFilePath);
 
@@ -2495,9 +2493,9 @@ public sealed class DiagramNode
 }
 public enum NodeKind
 {
-    Normal,
-    Start,
-    End
+    Normal = 0,
+    StartMarker = 1,
+    EndMarker = 2
 }
 public sealed class DiagramTransition
 {

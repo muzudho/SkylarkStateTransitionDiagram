@@ -33,19 +33,19 @@ internal static class YukaiLarkAssistOperations
     public static YukaiLarkAssistOperationResult Run(YukaiLarkAssistOperation operation)
         => operation.Kind switch
         {
-            YukaiLarkAssistKind.CreateStartNode => CreateStartNode(operation),
+            YukaiLarkAssistKind.CreateStartMarker => CreateStartMarker(operation),
             YukaiLarkAssistKind.CreateStateNode => CreateStateNode(operation),
             YukaiLarkAssistKind.CreateTransition => CreateTransition(operation),
             YukaiLarkAssistKind.AddTransitionEvent => AddTransitionEvent(operation),
-            YukaiLarkAssistKind.CreateEndNode => CreateEndNode(operation),
+            YukaiLarkAssistKind.CreateEndMarker => CreateEndMarker(operation),
             _ => new YukaiLarkAssistOperationResult(operation.NextNodeId, null, null, string.Empty, false)
         };
 
-    private static YukaiLarkAssistOperationResult CreateStartNode(YukaiLarkAssistOperation operation)
+    private static YukaiLarkAssistOperationResult CreateStartMarker(YukaiLarkAssistOperation operation)
     {
         var nextNodeId = operation.NextNodeId;
         DiagramNode? selectedNode = null;
-        var screenPosition = operation.GetNodeScreenPosition(operation.Viewport, YukaiLarkAssistKind.CreateStartNode);
+        var screenPosition = operation.GetNodeScreenPosition(operation.Viewport, YukaiLarkAssistKind.CreateStartMarker);
         var worldPosition = operation.ScreenToWorld(screenPosition);
         operation.ExecuteUndoableChange(() =>
         {
@@ -56,7 +56,7 @@ internal static class YukaiLarkAssistOperations
                 Position = operation.SnapToHalfGrid(worldPosition),
                 RadiusUnits = DiagramNode.TerminalRadiusUnits,
                 ColorIndex = 0,
-                Kind = NodeKind.Start
+                Kind = NodeKind.StartMarker
             };
             operation.Nodes.Add(node);
             selectedNode = node;
@@ -66,15 +66,15 @@ internal static class YukaiLarkAssistOperations
             nextNodeId,
             selectedNode,
             null,
-            "開始ノードを作成しました。次はNで状態追加、Shift+ドラッグで遷移作成。",
+            "開始マークを作成しました。次はNで状態追加、Shift+ドラッグで遷移作成。",
             selectedNode is not null);
     }
 
-    private static YukaiLarkAssistOperationResult CreateEndNode(YukaiLarkAssistOperation operation)
+    private static YukaiLarkAssistOperationResult CreateEndMarker(YukaiLarkAssistOperation operation)
     {
         var nextNodeId = operation.NextNodeId;
         DiagramNode? selectedNode = null;
-        var screenPosition = operation.GetNodeScreenPosition(operation.Viewport, YukaiLarkAssistKind.CreateEndNode);
+        var screenPosition = operation.GetNodeScreenPosition(operation.Viewport, YukaiLarkAssistKind.CreateEndMarker);
         var worldPosition = operation.ScreenToWorld(screenPosition);
         operation.ExecuteUndoableChange(() =>
         {
@@ -85,7 +85,7 @@ internal static class YukaiLarkAssistOperations
                 Position = operation.SnapToHalfGrid(worldPosition),
                 RadiusUnits = DiagramNode.TerminalRadiusUnits,
                 ColorIndex = 0,
-                Kind = NodeKind.End
+                Kind = NodeKind.EndMarker
             };
             operation.Nodes.Add(node);
             selectedNode = node;
@@ -95,7 +95,7 @@ internal static class YukaiLarkAssistOperations
             nextNodeId,
             selectedNode,
             null,
-            "終了ノードを作成しました。必要なら状態から終了へ遷移をつなげます。",
+            "終了マークを作成しました。必要なら状態から終了へ遷移をつなげます。",
             selectedNode is not null);
     }
 
@@ -124,7 +124,7 @@ internal static class YukaiLarkAssistOperations
             nextNodeId,
             selectedNode,
             null,
-            "状態ノードを作成しました。次は開始ノードから遷移をつなげます。",
+            "状態ノードを作成しました。次は開始マークから遷移をつなげます。",
             selectedNode is not null);
     }
 
@@ -159,15 +159,15 @@ internal static class YukaiLarkAssistOperations
 
     private static YukaiLarkAssistOperationResult CreateTransition(YukaiLarkAssistOperation operation)
     {
-        var source = operation.Nodes.FirstOrDefault(node => node.Kind == NodeKind.Start);
-        var target = operation.Nodes.FirstOrDefault(node => node.Kind != NodeKind.Start);
+        var source = operation.Nodes.FirstOrDefault(node => node.Kind == NodeKind.StartMarker);
+        var target = operation.Nodes.FirstOrDefault(node => node.Kind != NodeKind.StartMarker);
         if (source is null || target is null)
         {
             return new YukaiLarkAssistOperationResult(
                 operation.NextNodeId,
                 null,
                 null,
-                "遷移を作るには開始ノードと次の状態が必要です。",
+                "遷移を作るには開始マークと次の状態が必要です。",
                 false);
         }
 
