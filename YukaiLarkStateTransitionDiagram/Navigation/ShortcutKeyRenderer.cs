@@ -252,6 +252,7 @@ public sealed class ShortcutKeyRenderer : IDisposable
                 (
                     [
                         new HelpHint("N", "状態追加"),
+                        new HelpHint("E", "終了マーク追加"),
                         new HelpHint("Ctrl+N", "新規作成"),
                         new HelpHint("Ctrl+S", "保存"),
                         new HelpHint("Ctrl+Z/Y", "元に戻す/やり直し")
@@ -274,6 +275,7 @@ public sealed class ShortcutKeyRenderer : IDisposable
             (
                 [
                     new HelpHint("N", "状態追加"),
+                    new HelpHint("E", "終了マーク追加"),
                     new HelpHint("Ctrl+N", "新規作成"),
                     new HelpHint("Ctrl+S", "保存"),
                     new HelpHint("Ctrl+Z/Y", "元に戻す/やり直し")

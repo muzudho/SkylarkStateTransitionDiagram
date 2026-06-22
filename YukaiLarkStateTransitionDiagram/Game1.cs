@@ -383,6 +383,12 @@ public class Game1 : Game
         if (IsNewKeyPress(keyboard, Keys.N))
         {
             AddNode(ScreenToWorld(mouse.Position.ToVector2()));
+            return;
+        }
+        if (IsNewKeyPress(keyboard, Keys.E))
+        {
+            AddEndMarker(ScreenToWorld(mouse.Position.ToVector2()));
+            return;
         }
         if (IsNewKeyPress(keyboard, Keys.Delete) || IsNewKeyPress(keyboard, Keys.Back))
         {
@@ -1408,6 +1414,25 @@ public class Game1 : Game
             _selectedTransition = null;
         });
         _status = "状態を追加しました。F2・Enterでラベルを編集できます。";
+    }
+    private void AddEndMarker(Vector2 position)
+    {
+        ExecuteUndoableChange(() =>
+        {
+            var node = new DiagramNode
+            {
+                Id = _nextNodeId++,
+                Label = "終了",
+                Position = SnapToHalfGrid(position),
+                RadiusUnits = DiagramNode.TerminalRadiusUnits,
+                ColorIndex = 0,
+                Kind = NodeKind.EndMarker
+            };
+            _nodes.Add(node);
+            _selectedNode = node;
+            _selectedTransition = null;
+        });
+        _status = "終了マークを追加しました。必要なら状態から終了へ遷移をつなげます。";
     }
     private void RunYukaiLarkAssist(YukaiLarkAssistKind kind)
     {
