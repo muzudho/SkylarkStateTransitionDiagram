@@ -201,7 +201,9 @@ internal static class YukaiLarkAssistOperations
 
         var status = source.Kind == NodeKind.StartMarker
             ? "開始マークから次の状態へ遷移を作成しました。この遷移にはイベントを付けません。"
-            : "通常ノード同士の遷移を作成しました。次はイベントを追加できます。";
+            : target.Kind == NodeKind.EndMarker
+                ? "開始から一番遠い状態から終了マークへ遷移を作成しました。次はイベントを追加できます。"
+                : "通常ノード同士の遷移を作成しました。次はイベントを追加できます。";
         return new YukaiLarkAssistOperationResult(
             operation.NextNodeId,
             null,
@@ -217,6 +219,7 @@ internal static class YukaiLarkAssistOperations
         out DiagramNode target)
     {
         var startMarker = nodes.FirstOrDefault(node => node.Kind == NodeKind.StartMarker);
+        var endMarker = nodes.FirstOrDefault(node => node.Kind == NodeKind.EndMarker);
         var normalNodes = nodes
             .Where(node => node.Kind == NodeKind.Normal)
             .OrderBy(node => node.Id)
@@ -233,6 +236,21 @@ internal static class YukaiLarkAssistOperations
         {
             source = normalNodes[0];
             target = normalNodes[1];
+            return true;
+        }
+
+        var normalToEndSource = startMarker is null
+            ? normalNodes.LastOrDefault()
+            : normalNodes
+                .OrderByDescending(node => (node.Position - startMarker.Position).LengthSquared())
+                .ThenBy(node => node.Id)
+                .FirstOrDefault();
+        if (endMarker is not null
+            && normalToEndSource is not null
+            && !transitions.Any(t => t.SourceId == normalToEndSource.Id && t.TargetId == endMarker.Id))
+        {
+            source = normalToEndSource;
+            target = endMarker;
             return true;
         }
 

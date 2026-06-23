@@ -218,6 +218,11 @@ internal sealed class YukaiLarkAssistant
             return YukaiLarkAssistKind.CreateEndMarker;
         }
 
+        if (!context.HasNormalToEndTransition)
+        {
+            return YukaiLarkAssistKind.CreateTransition;
+        }
+
         return YukaiLarkAssistKind.None;
     }
 
@@ -230,13 +235,26 @@ internal sealed class YukaiLarkAssistant
             YukaiLarkAssistKind.CreateStartMarker => "ユカイラーク: わたしの名前はユカイラークです。開始マークを作れます。",
             YukaiLarkAssistKind.CreateStateNode => "ユカイラーク: 次の状態ノードを作れます。Enterか鳥をクリック。",
             YukaiLarkAssistKind.CreateSecondStateNode => "ユカイラーク: 通常ノード同士の遷移例用に、2つ目の状態を作れます。",
-            YukaiLarkAssistKind.CreateTransition => context.HasStartToNormalTransition
-                ? "ユカイラーク: 通常ノード同士の遷移をつなげます。Enterか鳥をクリック。"
-                : "ユカイラーク: 開始から次の状態へ遷移を作れます。Enterか鳥をクリック。",
+            YukaiLarkAssistKind.CreateTransition => GetTransitionStatusText(context),
             YukaiLarkAssistKind.AddTransitionEvent => $"ユカイラーク: {context.MissingTransitionEventSummary} 間の遷移にイベントがありません。Enterか鳥をクリック。",
             YukaiLarkAssistKind.CreateEndMarker => "ユカイラーク: 終了マークがまだありません。Enterか鳥をクリック。",
             _ => string.Empty
         };
+
+    private static string GetTransitionStatusText(YukaiLarkAssistantContext context)
+    {
+        if (!context.HasStartToNormalTransition)
+        {
+            return "ユカイラーク: 開始から次の状態へ遷移を作れます。Enterか鳥をクリック。";
+        }
+
+        if (context.NormalNodeCount >= 2 && !context.HasNormalToNormalTransition)
+        {
+            return "ユカイラーク: 通常ノード同士の遷移をつなげます。Enterか鳥をクリック。";
+        }
+
+        return "ユカイラーク: 開始から一番遠い状態から終了マークへ遷移をつなげます。Enterか鳥をクリック。";
+    }
 
     private static void DrawAssistBubble(
         SpriteBatch spriteBatch,
@@ -264,13 +282,26 @@ internal sealed class YukaiLarkAssistant
             YukaiLarkAssistKind.CreateStartMarker => ("わたしの名前はユカイラークです", "開始マークを作る？ Enter または鳥をクリック"),
             YukaiLarkAssistKind.CreateStateNode => ("次の状態を作る？", "Enter または鳥をクリック"),
             YukaiLarkAssistKind.CreateSecondStateNode => ("2つ目の状態を作る？", "作らないときは数秒待つと次へ進みます"),
-            YukaiLarkAssistKind.CreateTransition => context.HasStartToNormalTransition
-                ? ("通常ノード同士をつなぐ？", "Enter または鳥をクリック")
-                : ("遷移をつなぐ？", "Enter または鳥をクリック"),
+            YukaiLarkAssistKind.CreateTransition => GetTransitionBubbleText(context),
             YukaiLarkAssistKind.AddTransitionEvent => ("イベントを追加する？", $"{context.MissingTransitionEventSummary} 間の遷移"),
             YukaiLarkAssistKind.CreateEndMarker => ("終了マークを作る？", "Enter または鳥をクリック"),
             _ => (string.Empty, string.Empty)
         };
+
+    private static (string Title, string Body) GetTransitionBubbleText(YukaiLarkAssistantContext context)
+    {
+        if (!context.HasStartToNormalTransition)
+        {
+            return ("遷移をつなぐ？", "Enter または鳥をクリック");
+        }
+
+        if (context.NormalNodeCount >= 2 && !context.HasNormalToNormalTransition)
+        {
+            return ("通常ノード同士をつなぐ？", "Enter または鳥をクリック");
+        }
+
+        return ("終了マークへつなぐ？", "Enter または鳥をクリック");
+    }
 
     private static void DrawCompletedAssistBubble(
         SpriteBatch spriteBatch,
@@ -312,6 +343,7 @@ internal readonly record struct YukaiLarkAssistantContext(
     int NormalNodeCount,
     bool HasStartToNormalTransition,
     bool HasNormalToNormalTransition,
+    bool HasNormalToEndTransition,
     bool HasMissingTransitionEvent,
     string MissingTransitionEventSummary,
     bool IsInteractionIdle);

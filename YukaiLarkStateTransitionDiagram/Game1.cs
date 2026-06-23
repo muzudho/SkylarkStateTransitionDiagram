@@ -240,18 +240,29 @@ public class Game1 : Game
             .OrderBy(node => node.Id)
             .ToList();
         var startMarker = _nodes.FirstOrDefault(node => node.Kind == NodeKind.StartMarker);
+        var endMarker = _nodes.FirstOrDefault(node => node.Kind == NodeKind.EndMarker);
+        var normalToEndSource = startMarker is null
+            ? normalNodes.LastOrDefault()
+            : normalNodes
+                .OrderByDescending(node => (node.Position - startMarker.Position).LengthSquared())
+                .ThenBy(node => node.Id)
+                .FirstOrDefault();
         var hasStartToNormalTransition = startMarker is not null
             && normalNodes.Count >= 1
             && _transitions.Any(t => t.SourceId == startMarker.Id && t.TargetId == normalNodes[0].Id);
         var hasNormalToNormalTransition = normalNodes.Count >= 2
             && _transitions.Any(t => t.SourceId == normalNodes[0].Id && t.TargetId == normalNodes[1].Id);
+        var hasNormalToEndTransition = endMarker is not null
+            && normalToEndSource is not null
+            && _transitions.Any(t => t.SourceId == normalToEndSource.Id && t.TargetId == endMarker.Id);
 
         return new YukaiLarkAssistantContext(
             startMarker is not null,
-            _nodes.Any(node => node.Kind == NodeKind.EndMarker),
+            endMarker is not null,
             normalNodes.Count,
             hasStartToNormalTransition,
             hasNormalToNormalTransition,
+            hasNormalToEndTransition,
             !string.IsNullOrEmpty(missingTransitionEventSummary),
             missingTransitionEventSummary,
             !IsEditingLabel
@@ -2201,6 +2212,7 @@ public class Game1 : Game
     private bool TryGetAssistantTransitionEndpoints(out DiagramNode source, out DiagramNode target)
     {
         var startMarker = _nodes.FirstOrDefault(node => node.Kind == NodeKind.StartMarker);
+        var endMarker = _nodes.FirstOrDefault(node => node.Kind == NodeKind.EndMarker);
         var normalNodes = _nodes
             .Where(node => node.Kind == NodeKind.Normal)
             .OrderBy(node => node.Id)
@@ -2220,6 +2232,21 @@ public class Game1 : Game
         {
             source = normalNodes[0];
             target = normalNodes[1];
+            return true;
+        }
+
+        var normalToEndSource = startMarker is null
+            ? normalNodes.LastOrDefault()
+            : normalNodes
+                .OrderByDescending(node => (node.Position - startMarker.Position).LengthSquared())
+                .ThenBy(node => node.Id)
+                .FirstOrDefault();
+        if (endMarker is not null
+            && normalToEndSource is not null
+            && !_transitions.Any(t => t.SourceId == normalToEndSource.Id && t.TargetId == endMarker.Id))
+        {
+            source = normalToEndSource;
+            target = endMarker;
             return true;
         }
 
