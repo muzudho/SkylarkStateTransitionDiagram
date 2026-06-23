@@ -76,8 +76,8 @@ internal sealed class YukaiLarkAssistant
     public Vector2 GetNodeScreenPosition(Viewport viewport, YukaiLarkAssistKind kind)
         => kind switch
         {
-            YukaiLarkAssistKind.CreateStateNode => new Vector2(viewport.Width * 0.58f, viewport.Height * 0.45f),
-            YukaiLarkAssistKind.CreateEndMarker => new Vector2(viewport.Width * 0.74f, viewport.Height * 0.45f),
+            YukaiLarkAssistKind.CreateStateNode => new Vector2(viewport.Width * 0.66f, viewport.Height * 0.45f),
+            YukaiLarkAssistKind.CreateEndMarker => new Vector2(viewport.Width * 0.82f, viewport.Height * 0.45f),
             _ => new Vector2(viewport.Width * 0.42f, viewport.Height * 0.45f)
         };
 
