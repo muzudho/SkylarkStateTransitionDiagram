@@ -235,11 +235,23 @@ public class Game1 : Game
     private YukaiLarkAssistantContext CreateAssistantContext()
     {
         var missingTransitionEventSummary = GetMissingTransitionEventSummary();
+        var normalNodes = _nodes
+            .Where(node => node.Kind == NodeKind.Normal)
+            .OrderBy(node => node.Id)
+            .ToList();
+        var startMarker = _nodes.FirstOrDefault(node => node.Kind == NodeKind.StartMarker);
+        var hasStartToNormalTransition = startMarker is not null
+            && normalNodes.Count >= 1
+            && _transitions.Any(t => t.SourceId == startMarker.Id && t.TargetId == normalNodes[0].Id);
+        var hasNormalToNormalTransition = normalNodes.Count >= 2
+            && _transitions.Any(t => t.SourceId == normalNodes[0].Id && t.TargetId == normalNodes[1].Id);
+
         return new YukaiLarkAssistantContext(
-            _nodes.Any(node => node.Kind == NodeKind.StartMarker),
+            startMarker is not null,
             _nodes.Any(node => node.Kind == NodeKind.EndMarker),
-            _nodes.Count(node => node.Kind == NodeKind.Normal),
-            _transitions.Count,
+            normalNodes.Count,
+            hasStartToNormalTransition,
+            hasNormalToNormalTransition,
             !string.IsNullOrEmpty(missingTransitionEventSummary),
             missingTransitionEventSummary,
             !IsEditingLabel
@@ -250,7 +262,6 @@ public class Game1 : Game
                 && _draggedHandleTransition is null
                 && _resizedNode is null);
     }
-
     private string GetMissingTransitionEventSummary()
     {
         var transition = _transitions.FirstOrDefault(t => CanTransitionHaveEvent(t) && string.IsNullOrWhiteSpace(t.Label));
@@ -2146,7 +2157,10 @@ public class Game1 : Game
         }
 
         var nodeId = _nextNodeId;
-        var screenPosition = _yukaiLarkAssistant.GetNodeScreenPosition(GraphicsDevice.Viewport, YukaiLarkAssistKind.CreateStateNode);
+        var assistKind = context.NormalNodeCount == 1 && context.HasStartToNormalTransition
+            ? YukaiLarkAssistKind.CreateSecondStateNode
+            : YukaiLarkAssistKind.CreateStateNode;
+        var screenPosition = _yukaiLarkAssistant.GetNodeScreenPosition(GraphicsDevice.Viewport, assistKind);
         var worldPosition = SnapToHalfGrid(ScreenToWorld(screenPosition));
         var bob = YukaiLarkAssistant.GetAssistBobOffset(totalGameTime);
         var ghostNode = new DiagramNode
@@ -2168,9 +2182,7 @@ public class Game1 : Game
             return;
         }
 
-        var source = _nodes.FirstOrDefault(node => node.Kind == NodeKind.StartMarker);
-        var target = _nodes.FirstOrDefault(node => node.Kind == NodeKind.Normal);
-        if (source is null || target is null || _transitions.Any(t => t.SourceId == source.Id && t.TargetId == target.Id))
+        if (!TryGetAssistantTransitionEndpoints(out var source, out var target))
         {
             return;
         }
@@ -2186,6 +2198,35 @@ public class Game1 : Game
         _edgeRenderer.DrawTransitionGhost(start + offset, control1 + offset, control2 + offset, end + offset, 1f);
     }
 
+    private bool TryGetAssistantTransitionEndpoints(out DiagramNode source, out DiagramNode target)
+    {
+        var startMarker = _nodes.FirstOrDefault(node => node.Kind == NodeKind.StartMarker);
+        var normalNodes = _nodes
+            .Where(node => node.Kind == NodeKind.Normal)
+            .OrderBy(node => node.Id)
+            .ToList();
+
+        if (startMarker is not null
+            && normalNodes.Count >= 1
+            && !_transitions.Any(t => t.SourceId == startMarker.Id && t.TargetId == normalNodes[0].Id))
+        {
+            source = startMarker;
+            target = normalNodes[0];
+            return true;
+        }
+
+        if (normalNodes.Count >= 2
+            && !_transitions.Any(t => t.SourceId == normalNodes[0].Id && t.TargetId == normalNodes[1].Id))
+        {
+            source = normalNodes[0];
+            target = normalNodes[1];
+            return true;
+        }
+
+        source = null!;
+        target = null!;
+        return false;
+    }
     private void DrawTransitionEventGhost(TimeSpan totalGameTime)
     {
         var context = CreateAssistantContext();
@@ -2836,4 +2877,3 @@ public static class PrimitiveText
         }
     }
 }
-

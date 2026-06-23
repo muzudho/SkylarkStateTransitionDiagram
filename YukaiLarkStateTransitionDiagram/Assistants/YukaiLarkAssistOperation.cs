@@ -34,7 +34,8 @@ internal static class YukaiLarkAssistOperations
         => operation.Kind switch
         {
             YukaiLarkAssistKind.CreateStartMarker => CreateStartMarker(operation),
-            YukaiLarkAssistKind.CreateStateNode => CreateStateNode(operation),
+            YukaiLarkAssistKind.CreateStateNode => CreateStateNode(operation, YukaiLarkAssistKind.CreateStateNode),
+            YukaiLarkAssistKind.CreateSecondStateNode => CreateStateNode(operation, YukaiLarkAssistKind.CreateSecondStateNode),
             YukaiLarkAssistKind.CreateTransition => CreateTransition(operation),
             YukaiLarkAssistKind.AddTransitionEvent => AddTransitionEvent(operation),
             YukaiLarkAssistKind.CreateEndMarker => CreateEndMarker(operation),
@@ -99,11 +100,11 @@ internal static class YukaiLarkAssistOperations
             selectedNode is not null);
     }
 
-    private static YukaiLarkAssistOperationResult CreateStateNode(YukaiLarkAssistOperation operation)
+    private static YukaiLarkAssistOperationResult CreateStateNode(YukaiLarkAssistOperation operation, YukaiLarkAssistKind kind)
     {
         var nextNodeId = operation.NextNodeId;
         DiagramNode? selectedNode = null;
-        var screenPosition = operation.GetNodeScreenPosition(operation.Viewport, YukaiLarkAssistKind.CreateStateNode);
+        var screenPosition = operation.GetNodeScreenPosition(operation.Viewport, kind);
         var worldPosition = operation.ScreenToWorld(screenPosition);
         operation.ExecuteUndoableChange(() =>
         {
@@ -120,11 +121,14 @@ internal static class YukaiLarkAssistOperations
             selectedNode = node;
         });
 
+        var status = kind == YukaiLarkAssistKind.CreateSecondStateNode
+            ? "2つ目の状態ノードを作成しました。次は通常ノード同士の遷移をつなげます。"
+            : "状態ノードを作成しました。次は開始マークから遷移をつなげます。";
         return new YukaiLarkAssistOperationResult(
             nextNodeId,
             selectedNode,
             null,
-            "状態ノードを作成しました。次は開始マークから遷移をつなげます。",
+            status,
             selectedNode is not null);
     }
 
@@ -157,6 +161,7 @@ internal static class YukaiLarkAssistOperations
         var target = nodes.FirstOrDefault(node => node.Id == transition.TargetId);
         return source?.Kind != NodeKind.StartMarker || target?.Kind != NodeKind.Normal;
     }
+
     private static string GetNodeLabel(IEnumerable<DiagramNode> nodes, int nodeId)
     {
         var node = nodes.FirstOrDefault(n => n.Id == nodeId);
@@ -165,15 +170,13 @@ internal static class YukaiLarkAssistOperations
 
     private static YukaiLarkAssistOperationResult CreateTransition(YukaiLarkAssistOperation operation)
     {
-        var source = operation.Nodes.FirstOrDefault(node => node.Kind == NodeKind.StartMarker);
-        var target = operation.Nodes.FirstOrDefault(node => node.Kind == NodeKind.Normal);
-        if (source is null || target is null)
+        if (!TryGetTransitionEndpoints(operation.Nodes, operation.Transitions, out var source, out var target))
         {
             return new YukaiLarkAssistOperationResult(
                 operation.NextNodeId,
                 null,
                 null,
-                "遷移を作るには開始マークと次の状態が必要です。",
+                "遷移を作るには接続元と接続先の状態が必要です。",
                 false);
         }
 
@@ -196,11 +199,45 @@ internal static class YukaiLarkAssistOperations
             selectedTransition = transition;
         });
 
+        var status = source.Kind == NodeKind.StartMarker
+            ? "開始マークから次の状態へ遷移を作成しました。この遷移にはイベントを付けません。"
+            : "通常ノード同士の遷移を作成しました。次はイベントを追加できます。";
         return new YukaiLarkAssistOperationResult(
             operation.NextNodeId,
             null,
             selectedTransition,
-            "開始マークから次の状態へ遷移を作成しました。この遷移にはイベントを付けません。",
+            status,
             selectedTransition is not null);
+    }
+
+    private static bool TryGetTransitionEndpoints(
+        IReadOnlyCollection<DiagramNode> nodes,
+        IEnumerable<DiagramTransition> transitions,
+        out DiagramNode source,
+        out DiagramNode target)
+    {
+        var startMarker = nodes.FirstOrDefault(node => node.Kind == NodeKind.StartMarker);
+        var normalNodes = nodes
+            .Where(node => node.Kind == NodeKind.Normal)
+            .OrderBy(node => node.Id)
+            .ToList();
+
+        if (startMarker is not null && normalNodes.Count >= 1 && !transitions.Any(t => t.SourceId == startMarker.Id && t.TargetId == normalNodes[0].Id))
+        {
+            source = startMarker;
+            target = normalNodes[0];
+            return true;
+        }
+
+        if (normalNodes.Count >= 2 && !transitions.Any(t => t.SourceId == normalNodes[0].Id && t.TargetId == normalNodes[1].Id))
+        {
+            source = normalNodes[0];
+            target = normalNodes[1];
+            return true;
+        }
+
+        source = null!;
+        target = null!;
+        return false;
     }
 }
