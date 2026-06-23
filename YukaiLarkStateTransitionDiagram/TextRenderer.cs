@@ -104,6 +104,14 @@ public static class TextRenderer
         graphics.DrawString(text, font, DrawingBrushes.White, new DrawingRectangleF(0, 0, width, height), CenteredStringFormat);
         return CreateTexture(graphicsDevice, bitmap, width, height);
     }
+    public static float MeasureLabelTextWidth(string label)
+    {
+        var text = string.IsNullOrEmpty(label) ? " " : label;
+        using var font = CreateJapaneseFont(22, true);
+        using var measureBitmap = new DrawingBitmap(1, 1);
+        using var measureGraphics = DrawingGraphics.FromImage(measureBitmap);
+        return measureGraphics.MeasureString(text, font, 512, StringFormatNoWrap).Width;
+    }
 
     /// <summary>
     /// 日本語を描画しやすいフォントを作成する。

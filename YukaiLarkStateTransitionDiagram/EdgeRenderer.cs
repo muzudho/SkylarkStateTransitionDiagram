@@ -46,13 +46,15 @@ public sealed class EdgeRenderer
         Vector2 end,
         bool selected,
         bool editing,
-        string editingLabel)
+        string editingLabel,
+        int editingCaretIndex,
+        bool showEditingCaret)
     {
         var lineColor = selected ? Theme.SelectedTransitionLineColor : Theme.TransitionLineColor;
         var thickness = selected ? 4f : 3f;
 
         DrawBezierArrow(start, control1, control2, end, lineColor, thickness);
-        DrawTransitionLabel(transition, start, control1, control2, end, selected, editing, editingLabel);
+        DrawTransitionLabel(transition, start, control1, control2, end, selected, editing, editingLabel, editingCaretIndex, showEditingCaret);
     }
 
     /// <summary>
@@ -137,11 +139,13 @@ public sealed class EdgeRenderer
         Vector2 end,
         bool selected,
         bool editing,
-        string editingLabel)
+        string editingLabel,
+        int editingCaretIndex,
+        bool showEditingCaret)
     {
         if (editing)
         {
-            DrawTransitionEventEditor(transition, start, control1, control2, end, editingLabel, 1f);
+            DrawTransitionEventEditor(transition, start, control1, control2, end, editingLabel, editingCaretIndex, showEditingCaret, 1f);
             return;
         }
 
@@ -169,7 +173,7 @@ public sealed class EdgeRenderer
     /// <param name="opacity">不透明度</param>
     public void DrawTransitionEventGhost(DiagramTransition transition, Vector2 start, Vector2 control1, Vector2 control2, Vector2 end, float opacity)
     {
-        DrawTransitionEventEditor(transition, start, control1, control2, end, string.Empty, opacity);
+        DrawTransitionEventEditor(transition, start, control1, control2, end, string.Empty, 0, false, opacity);
     }
 
     private void DrawTransitionEventEditor(
@@ -179,10 +183,12 @@ public sealed class EdgeRenderer
         Vector2 control2,
         Vector2 end,
         string editingLabel,
+        int editingCaretIndex,
+        bool showCaret,
         float opacity)
     {
         var isEmpty = string.IsNullOrEmpty(editingLabel);
-        var displayLabel = isEmpty ? "イベント名_" : editingLabel + "_";
+        var displayLabel = isEmpty ? "イベント名" : editingLabel;
         var texture = _getLabelTexture(displayLabel, true);
         var center = GetTransitionLabelCenter(start, control1, control2, end, transition.LabelSide, texture);
         var position = center - new Vector2(texture.Width / 2f, texture.Height / 2f);
@@ -191,6 +197,26 @@ public sealed class EdgeRenderer
             ? Theme.SelectedTransitionLabelColor * (alpha * 0.62f)
             : Theme.SelectedTransitionLabelColor * alpha;
         _spriteBatch.Draw(texture, position, labelColor);
+
+        if (showCaret && alpha > 0f)
+        {
+            var caretLabel = isEmpty ? displayLabel : editingLabel;
+            var caretIndex = isEmpty ? caretLabel.Length : Math.Clamp(editingCaretIndex, 0, caretLabel.Length);
+            DrawEditingCaret(position, texture, caretLabel, caretIndex, Theme.SelectedTransitionLabelColor * alpha);
+        }
+    }
+
+    private void DrawEditingCaret(Vector2 texturePosition, Texture2D texture, string label, int caretIndex, Color color)
+    {
+        var textWidth = TextRenderer.MeasureLabelTextWidth(label);
+        var prefixWidth = caretIndex <= 0
+            ? 0f
+            : TextRenderer.MeasureLabelTextWidth(label[..caretIndex]);
+        var textLeft = texturePosition.X + ((texture.Width - textWidth) / 2f);
+        var x = textLeft + prefixWidth + 1f;
+        var top = texturePosition.Y + 6f;
+        var bottom = texturePosition.Y + texture.Height - 6f;
+        _primitiveRenderer.DrawLine(new Vector2(x, top), new Vector2(x, bottom), color, 2f);
     }
 
     /// <summary>

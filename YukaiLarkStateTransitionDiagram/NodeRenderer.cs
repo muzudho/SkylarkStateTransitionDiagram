@@ -33,7 +33,7 @@ public sealed class NodeRenderer
     /// <param name="selected">選択されているかどうか</param>
     /// <param name="editingNode">編集中のノード</param>
     /// <param name="editingLabel">編集中のラベル</param>
-    public void DrawNode(DiagramNode node, bool selected, DiagramNode? editingNode, string editingLabel)
+    public void DrawNode(DiagramNode node, bool selected, DiagramNode? editingNode, string editingLabel, int editingCaretIndex, bool showEditingCaret)
     {
         var fill = node.Kind == NodeKind.Normal && _palette.Length > 0
             ? _palette[node.ColorIndex % _palette.Length]
@@ -59,8 +59,18 @@ public sealed class NodeRenderer
             _primitiveRenderer.DrawCircleOutline(node.Position, node.Radius - 7f, Color.White, 2f);
         }
 
-        var label = node == editingNode ? editingLabel + "_" : node.Label;
-        DrawNodeLabel(label, node.Position, node == editingNode);
+        if (node == editingNode)
+        {
+            DrawNodeLabel(editingLabel, node.Position, editing: true);
+            if (showEditingCaret)
+            {
+                DrawEditingCaret(editingLabel, editingCaretIndex, node.Position, Color.White);
+            }
+        }
+        else
+        {
+            DrawNodeLabel(node.Label, node.Position, editing: false);
+        }
     }
 
     /// <summary>
@@ -124,6 +134,21 @@ public sealed class NodeRenderer
         _spriteBatch.Draw(texture, position, color);
     }
 
+    private void DrawEditingCaret(string label, int caretIndex, Vector2 center, Color color)
+    {
+        var texture = _getLabelTexture(label, true);
+        var texturePosition = center - new Vector2(texture.Width / 2f, texture.Height / 2f);
+        var normalizedCaretIndex = Math.Clamp(caretIndex, 0, label.Length);
+        var textWidth = TextRenderer.MeasureLabelTextWidth(label);
+        var prefixWidth = normalizedCaretIndex <= 0
+            ? 0f
+            : TextRenderer.MeasureLabelTextWidth(label[..normalizedCaretIndex]);
+        var textLeft = texturePosition.X + ((texture.Width - textWidth) / 2f);
+        var x = textLeft + prefixWidth + 1f;
+        var top = texturePosition.Y + 6f;
+        var bottom = texturePosition.Y + texture.Height - 6f;
+        _primitiveRenderer.DrawLine(new Vector2(x, top), new Vector2(x, bottom), color, 2f);
+    }
     /// <summary>
     /// ノードのリサイズハンドルの中心座標を取得します。
     /// </summary>

@@ -103,6 +103,7 @@ public class Game1 : Game
     private int _nextNodeId = 1;
     private string _editingLabel = string.Empty;
     private string _imeCompositionLabel = string.Empty;
+    private int _editingCaretIndex;
     private string _status = DefaultStatus;
     private const string DefaultStatus = "N: 状態追加 / S: 開始マーク / Shift+ドラッグ: 遷移作成 / F2・Enter: ラベル編集 / Ctrl+Z/Y: 元に戻す/やり直し / Ctrl+S: 保存";
     public Game1()
@@ -303,7 +304,8 @@ public class Game1 : Game
             _status = "ラベルは24文字までです。";
             return;
         }
-        _editingLabel += e.Character;
+        _editingLabel = _editingLabel.Insert(_editingCaretIndex, e.Character.ToString());
+        _editingCaretIndex++;
         _imeCompositionLabel = string.Empty;
     }
 
@@ -312,16 +314,24 @@ public class Game1 : Game
 
     private string GetEditingDisplayLabel()
     {
+        var composition = GetVisibleImeComposition();
+        return _editingLabel[.._editingCaretIndex] + composition + _editingLabel[_editingCaretIndex..];
+    }
+
+    private int GetEditingDisplayCaretIndex()
+        => _editingCaretIndex + GetVisibleImeComposition().Length;
+
+    private string GetVisibleImeComposition()
+    {
         if (string.IsNullOrEmpty(_imeCompositionLabel))
         {
-            return _editingLabel;
+            return string.Empty;
         }
 
         var availableLength = Math.Max(0, 24 - _editingLabel.Length);
-        var composition = _imeCompositionLabel.Length <= availableLength
+        return _imeCompositionLabel.Length <= availableLength
             ? _imeCompositionLabel
             : _imeCompositionLabel[..availableLength];
-        return _editingLabel + composition;
     }
 
     private void HandleKeyboard(KeyboardState keyboard, MouseState mouse)
@@ -792,6 +802,8 @@ public class Game1 : Game
         _draggedHandleKind = TransitionHandleKind.None;
         _resizedNode = null;
         _editingLabel = string.Empty;
+        _imeCompositionLabel = string.Empty;
+        _editingCaretIndex = 0;
         _isPanning = false;
         _isExportSelecting = false;
         _exportSelectionDragging = false;
@@ -1192,9 +1204,30 @@ public class Game1 : Game
             CancelLabelEdit();
             return;
         }
-        if (IsNewKeyPress(keyboard, Keys.Back) && _editingLabel.Length > 0)
+        if (IsNewKeyPress(keyboard, Keys.Left) && _editingCaretIndex > 0)
         {
-            _editingLabel = _editingLabel[..^1];
+            _editingCaretIndex--;
+        }
+        if (IsNewKeyPress(keyboard, Keys.Right) && _editingCaretIndex < _editingLabel.Length)
+        {
+            _editingCaretIndex++;
+        }
+        if (IsNewKeyPress(keyboard, Keys.Home))
+        {
+            _editingCaretIndex = 0;
+        }
+        if (IsNewKeyPress(keyboard, Keys.End))
+        {
+            _editingCaretIndex = _editingLabel.Length;
+        }
+        if (IsNewKeyPress(keyboard, Keys.Back) && _editingCaretIndex > 0)
+        {
+            _editingLabel = _editingLabel.Remove(_editingCaretIndex - 1, 1);
+            _editingCaretIndex--;
+        }
+        if (IsNewKeyPress(keyboard, Keys.Delete) && _editingCaretIndex < _editingLabel.Length)
+        {
+            _editingLabel = _editingLabel.Remove(_editingCaretIndex, 1);
         }
     }
     private void BeginLabelEdit(DiagramNode node)
@@ -1202,6 +1235,7 @@ public class Game1 : Game
         _editingNode = node;
         _editingTransition = null;
         _editingLabel = node.Label;
+        _editingCaretIndex = _editingLabel.Length;
         _imeCompositionLabel = string.Empty;
         _draggedNode = null;
         _resizedNode = null;
@@ -1224,6 +1258,7 @@ public class Game1 : Game
         _editingNode = null;
         _editingTransition = transition;
         _editingLabel = transition.Label;
+        _editingCaretIndex = _editingLabel.Length;
         _imeCompositionLabel = string.Empty;
         _draggedNode = null;
         _resizedNode = null;
@@ -1261,6 +1296,7 @@ public class Game1 : Game
         _editingTransition = null;
         _editingLabel = string.Empty;
         _imeCompositionLabel = string.Empty;
+        _editingCaretIndex = 0;
     }
     private void CancelLabelEdit()
     {
@@ -1268,6 +1304,7 @@ public class Game1 : Game
         _editingTransition = null;
         _editingLabel = string.Empty;
         _imeCompositionLabel = string.Empty;
+        _editingCaretIndex = 0;
         _status = "ラベル編集をキャンセルしました。";
     }
     private void ToggleTransitionLabelSide(DiagramTransition transition)
@@ -1748,6 +1785,8 @@ public class Game1 : Game
         _draggedHandleKind = TransitionHandleKind.None;
         _resizedNode = null;
         _editingLabel = string.Empty;
+        _imeCompositionLabel = string.Empty;
+        _editingCaretIndex = 0;
         _pendingHistorySnapshot = null;
         _cameraOffset = Vector2.Zero;
         _isPanning = false;
@@ -2072,6 +2111,8 @@ public class Game1 : Game
     private void DrawDiagramContent(bool includeInteraction, TimeSpan totalGameTime)
     {
         var editingDisplayLabel = GetEditingDisplayLabel();
+        var editingDisplayCaretIndex = GetEditingDisplayCaretIndex();
+        var showEditingCaret = ((int)(totalGameTime.TotalSeconds * 2)) % 2 == 0;
         if (includeInteraction)
         {
             DrawTransitionGhost(totalGameTime);
@@ -2099,7 +2140,9 @@ public class Game1 : Game
                     end,
                     includeInteraction && transition == _selectedTransition,
                     transition == _editingTransition,
-                    editingDisplayLabel);
+                    editingDisplayLabel,
+                    editingDisplayCaretIndex,
+                    showEditingCaret);
             }
         }
         if (includeInteraction)
@@ -2122,7 +2165,7 @@ public class Game1 : Game
         }
         foreach (var node in _nodes)
         {
-            _nodeRenderer.DrawNode(node, includeInteraction && node == _selectedNode, _editingNode, editingDisplayLabel);
+            _nodeRenderer.DrawNode(node, includeInteraction && node == _selectedNode, _editingNode, editingDisplayLabel, editingDisplayCaretIndex, showEditingCaret);
         }
         if (includeInteraction && _selectedNode is not null)
         {
