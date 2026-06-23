@@ -241,7 +241,6 @@ public sealed class ShortcutKeyRenderer : IDisposable
             var nodeHints = new List<HelpHint>
             {
                 new("F2・Enter", "ラベル編集"),
-                new("T", "種類変更"),
                 new("Delete", "状態削除")
             };
 

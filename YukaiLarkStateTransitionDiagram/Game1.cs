@@ -400,10 +400,6 @@ public class Game1 : Game
         {
             DeleteSelection();
         }
-        if (IsNewKeyPress(keyboard, Keys.T) && _selectedNode is not null)
-        {
-            ToggleNodeKind(_selectedNode);
-        }
         if (IsNewKeyPress(keyboard, Keys.C) && _selectedNode is not null)
         {
             if (_selectedNode.Kind == NodeKind.Normal)
@@ -416,7 +412,7 @@ public class Game1 : Game
             }
             else
             {
-                _status = "開始・終了マークは黒固定です。Tで通常ノードに戻せます。";
+                _status = "開始・終了マークは黒固定です。状態の色は通常ノードで変更できます。";
             }
         }
     }
@@ -1233,28 +1229,6 @@ public class Game1 : Game
         _editingLabel = string.Empty;
         _imeCompositionLabel = string.Empty;
         _status = "ラベル編集をキャンセルしました。";
-    }
-    private void ToggleNodeKind(DiagramNode node)
-    {
-        ExecuteUndoableChange(() =>
-        {
-            node.Kind = node.Kind switch
-            {
-                NodeKind.Normal => NodeKind.StartMarker,
-                NodeKind.StartMarker => NodeKind.Normal,
-                _ => NodeKind.Normal
-            };
-            node.RadiusUnits = node.Kind is NodeKind.StartMarker or NodeKind.EndMarker
-                ? DiagramNode.TerminalRadiusUnits
-                : DiagramNode.DefaultRadiusUnits;
-        });
-
-        _status = node.Kind switch
-        {
-            NodeKind.StartMarker => "選択中の部品を開始マークにしました。",
-            NodeKind.EndMarker => "選択中の部品を終了マークにしました。",
-            _ => "選択中の状態を通常ノードに戻しました。"
-        };
     }
     private void ToggleTransitionLabelSide(DiagramTransition transition)
     {
