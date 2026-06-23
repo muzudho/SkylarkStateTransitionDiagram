@@ -63,6 +63,7 @@ public sealed class ShortcutKeyRenderer : IDisposable
     /// <param name="isEditingLabel">ラベル編集中かどうか</param>
     /// <param name="isExportSelecting">エクスポート選択中かどうか</param>
     /// <param name="hasExportSelection">エクスポート範囲が作成済みかどうか</param>
+    /// <param name="hasStartMarker">開始マークが存在するかどうか</param>
     /// <param name="selectedNode">選択されているノード</param>
     /// <param name="selectedTransition">選択されている遷移</param>
     public void DrawBottomHelp(
@@ -71,6 +72,7 @@ public sealed class ShortcutKeyRenderer : IDisposable
         bool isEditingLabel,
         bool isExportSelecting,
         bool hasExportSelection,
+        bool hasStartMarker,
         DiagramNode? selectedNode,
         DiagramTransition? selectedTransition)
     {
@@ -82,7 +84,7 @@ public sealed class ShortcutKeyRenderer : IDisposable
         var y = viewport.Height - 34;
         _spriteBatch.Draw(_pixel, new Rectangle(0, y, viewport.Width, 34), _boardTheme.BottomBarBackgroundColor);
 
-        var pages = GetHelpPages(isEditingLabel, isExportSelecting, hasExportSelection, selectedNode, selectedTransition);
+        var pages = GetHelpPages(isEditingLabel, isExportSelecting, hasExportSelection, hasStartMarker, selectedNode, selectedTransition);
         if (pages.Length == 0)
         {
             return;
@@ -155,9 +157,14 @@ public sealed class ShortcutKeyRenderer : IDisposable
         bool isEditingLabel,
         bool isExportSelecting,
         bool hasExportSelection,
+        bool hasStartMarker,
         DiagramNode? selectedNode,
         DiagramTransition? selectedTransition)
     {
+        var startMarkerHint = hasStartMarker
+            ? new HelpHint("S", "開始へ移動")
+            : new HelpHint("S", "開始マーク追加");
+
         if (isExportSelecting)
         {
             var exportHints = new List<HelpHint>
@@ -213,6 +220,7 @@ public sealed class ShortcutKeyRenderer : IDisposable
                     [
                         new HelpHint("Shift+ドラッグ", "遷移作成"),
                         new HelpHint("Shift+同一状態", "自己ループ"),
+                        startMarkerHint,
                         new HelpHint("Ctrl+S", "保存"),
                         new HelpHint("Ctrl+Z/Y", "元に戻す/やり直し")
                     ]
@@ -252,6 +260,7 @@ public sealed class ShortcutKeyRenderer : IDisposable
                 (
                     [
                         new HelpHint("N", "状態追加"),
+                        startMarkerHint,
                         new HelpHint("E", "終了マーク追加"),
                         new HelpHint("Ctrl+N", "新規作成"),
                         new HelpHint("Ctrl+S", "保存"),
@@ -275,6 +284,7 @@ public sealed class ShortcutKeyRenderer : IDisposable
             (
                 [
                     new HelpHint("N", "状態追加"),
+                    startMarkerHint,
                     new HelpHint("E", "終了マーク追加"),
                     new HelpHint("Ctrl+N", "新規作成"),
                     new HelpHint("Ctrl+S", "保存"),

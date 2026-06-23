@@ -104,7 +104,7 @@ public class Game1 : Game
     private string _editingLabel = string.Empty;
     private string _imeCompositionLabel = string.Empty;
     private string _status = DefaultStatus;
-    private const string DefaultStatus = "N: 状態追加 / Shift+ドラッグ: 遷移作成 / F2・Enter: ラベル編集 / Ctrl+Z/Y: 元に戻す/やり直し / Ctrl+S: 保存";
+    private const string DefaultStatus = "N: 状態追加 / S: 開始マーク / Shift+ドラッグ: 遷移作成 / F2・Enter: ラベル編集 / Ctrl+Z/Y: 元に戻す/やり直し / Ctrl+S: 保存";
     public Game1()
     {
         _graphics = new GraphicsDeviceManager(this)
@@ -203,6 +203,7 @@ public class Game1 : Game
             IsEditingLabel,
             _isExportSelecting,
             _hasExportSelection,
+            _nodes.Any(node => node.Kind == NodeKind.StartMarker),
             _selectedNode,
             _selectedTransition);
         DrawExportSelectionOverlay();
@@ -388,6 +389,11 @@ public class Game1 : Game
         if (IsNewKeyPress(keyboard, Keys.E))
         {
             AddEndMarker(ScreenToWorld(mouse.Position.ToVector2()));
+            return;
+        }
+        if (IsNewKeyPress(keyboard, Keys.S))
+        {
+            HandleStartMarkerShortcut(ScreenToWorld(mouse.Position.ToVector2()));
             return;
         }
         if (IsNewKeyPress(keyboard, Keys.Delete) || IsNewKeyPress(keyboard, Keys.Back))
@@ -1434,6 +1440,55 @@ public class Game1 : Game
         });
         _status = "終了マークを追加しました。必要なら状態から終了へ遷移をつなげます。";
     }
+
+    private void HandleStartMarkerShortcut(Vector2 position)
+    {
+        var startMarker = _nodes.FirstOrDefault(node => node.Kind == NodeKind.StartMarker);
+        if (startMarker is null)
+        {
+            AddStartMarker(position);
+            return;
+        }
+
+        CenterViewOnWorldPosition(startMarker.Position);
+        _selectedNode = startMarker;
+        _selectedTransition = null;
+        _status = "開始マークが画面中央に来るよう表示位置を移動しました。";
+    }
+
+    private void AddStartMarker(Vector2 position)
+    {
+        ExecuteUndoableChange(() =>
+        {
+            if (_nodes.Any(node => node.Kind == NodeKind.StartMarker))
+            {
+                return;
+            }
+
+            var node = new DiagramNode
+            {
+                Id = _nextNodeId++,
+                Label = "開始",
+                Position = SnapToHalfGrid(position),
+                RadiusUnits = DiagramNode.TerminalRadiusUnits,
+                ColorIndex = 0,
+                Kind = NodeKind.StartMarker
+            };
+            _nodes.Add(node);
+            _selectedNode = node;
+            _selectedTransition = null;
+        });
+        _status = "開始マークを追加しました。Sで開始マークへ戻れます。";
+    }
+
+    private void CenterViewOnWorldPosition(Vector2 worldPosition)
+    {
+        var viewport = GraphicsDevice.Viewport;
+        var screenCenter = new Vector2(viewport.Width / 2f, viewport.Height / 2f);
+        _cameraOffset = screenCenter - worldPosition;
+        _isPanning = false;
+    }
+
     private void RunYukaiLarkAssist(YukaiLarkAssistKind kind)
     {
         var result = YukaiLarkAssistOperations.Run(new YukaiLarkAssistOperation
