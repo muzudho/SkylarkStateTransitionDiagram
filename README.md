@@ -14,8 +14,8 @@
 
 ## 開発日誌
 
-- [2026年6月まとめ](YukaiLarkStateTransitionDiagram/Docs/開発/開発日誌_2026-06.md) - 開発の流れ、見どころ、日別の日誌への入口
-- [最新の日誌 2026-06-24](YukaiLarkStateTransitionDiagram/Docs/開発/開発日誌_2026-06-24.md) - PNG出力自動枠と撮影演出の記録
+- [最新の月別開発日誌: 2026年6月](YukaiLarkStateTransitionDiagram/Docs/開発/開発日誌_2026-06.md) - 1か月分を1ファイルで読めます。
+
 
 ## できること
 
@@ -66,7 +66,7 @@ Visual Studio から起動する場合は、`YukaiLarkStateTransitionDiagram.sln
 ## ドキュメント
 
 - [使い方説明書](YukaiLarkStateTransitionDiagram/Docs/使い方説明書.md)
-- [開発日誌 2026年6月まとめ](YukaiLarkStateTransitionDiagram/Docs/開発/開発日誌_2026-06.md)
+- [最新の月別開発日誌: 2026年6月](YukaiLarkStateTransitionDiagram/Docs/開発/開発日誌_2026-06.md)
 - [Docs README](YukaiLarkStateTransitionDiagram/Docs/README.md)
 
 ## ライセンス
