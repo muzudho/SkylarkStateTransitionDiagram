@@ -12,6 +12,11 @@
 
 ![サンプル状態遷移図の画面例](YukaiLarkStateTransitionDiagram/Assets/Screenshots/スクリーンショット%202026-06-21%20225846.png)  
 
+## 開発日誌
+
+- [2026年6月まとめ](YukaiLarkStateTransitionDiagram/Docs/開発/開発日誌_2026-06.md) - 開発の流れ、見どころ、日別の日誌への入口
+- [最新の日誌 2026-06-24](YukaiLarkStateTransitionDiagram/Docs/開発/開発日誌_2026-06-24.md) - PNG出力自動枠と撮影演出の記録
+
 ## できること
 
 - 日本語ラベル付きの状態ノードを作れます。
@@ -61,8 +66,8 @@ Visual Studio から起動する場合は、`YukaiLarkStateTransitionDiagram.sln
 ## ドキュメント
 
 - [使い方説明書](YukaiLarkStateTransitionDiagram/Docs/使い方説明書.md)
+- [開発日誌 2026年6月まとめ](YukaiLarkStateTransitionDiagram/Docs/開発/開発日誌_2026-06.md)
 - [Docs README](YukaiLarkStateTransitionDiagram/Docs/README.md)
-- [開発日誌 2026-06-21](YukaiLarkStateTransitionDiagram/Docs/開発/開発日誌_2026-06-21.md)
 
 ## ライセンス
 
