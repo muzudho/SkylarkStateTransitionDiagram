@@ -342,7 +342,8 @@ internal sealed class YukaiLarkAssistant
 
         var hasSecondaryText = !string.IsNullOrWhiteSpace(secondaryText);
         var bandHeight = hasSecondaryText ? 76 : 56;
-        var y = Math.Clamp(mascotBounds.Bottom + 16, 86, viewport.Height - bandHeight - 72);
+        var preferredY = Math.Max(mascotBounds.Bottom + 16, (int)(viewport.Height * 0.72f));
+        var y = Math.Clamp(preferredY, 86, viewport.Height - bandHeight - 72);
         var band = new Rectangle(0, y, viewport.Width, bandHeight);
         var frameWidth = Math.Min(760, Math.Max(420, viewport.Width - 112));
         var frame = new Rectangle((viewport.Width - frameWidth) / 2, y + 7, frameWidth, bandHeight - 14);
