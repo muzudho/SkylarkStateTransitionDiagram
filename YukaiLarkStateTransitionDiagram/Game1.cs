@@ -76,6 +76,7 @@ public class Game1 : Game
     private Texture2D _pixel = null!;
     private Texture2D? _yukaiLarkMascotTexture;
     private readonly YukaiLarkAssistant _yukaiLarkAssistant = new();
+    private readonly TextBoxController _textBoxController = new(24);
     private AppConfig _appConfig = new();
 
     private MouseState _previousMouse;
@@ -109,9 +110,6 @@ public class Game1 : Game
     private float _exportFlashSecondsRemaining;
     private float _exportPhotoPreviewSecondsRemaining;
     private int _nextNodeId = 1;
-    private string _editingLabel = string.Empty;
-    private string _imeCompositionLabel = string.Empty;
-    private int _editingCaretIndex;
     private string _status = DefaultStatus;
     private const string DefaultStatus = "N: 状態追加 / S: 開始マーク / Shift+ドラッグ: 遷移作成 / F2・Enter: ラベル編集 / Ctrl+Z/Y: 元に戻す/やり直し / Ctrl+S: 保存";
     public Game1()
@@ -178,12 +176,12 @@ public class Game1 : Game
         }
         else if (IsEditingLabel)
         {
-            UpdateImeCompositionLabel();
+            _textBoxController.UpdateImeComposition();
             HandleLabelEditingKeyboard(keyboard);
         }
         else
         {
-            _imeCompositionLabel = string.Empty;
+            _textBoxController.Clear();
             if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed)
             {
                 Exit();
@@ -305,44 +303,22 @@ public class Game1 : Game
 
     private void OnTextInput(object? sender, TextInputEventArgs e)
     {
-        if (!IsEditingLabel || char.IsControl(e.Character))
+        if (!IsEditingLabel)
         {
             return;
         }
-        if (_editingLabel.Length >= 24)
+
+        if (!_textBoxController.TryInputCharacter(e.Character))
         {
             _status = "ラベルは24文字までです。";
-            return;
         }
-        _editingLabel = _editingLabel.Insert(_editingCaretIndex, e.Character.ToString());
-        _editingCaretIndex++;
-        _imeCompositionLabel = string.Empty;
     }
-
-    private void UpdateImeCompositionLabel()
-        => _imeCompositionLabel = WindowsImeCompositionReader.GetCompositionString();
 
     private string GetEditingDisplayLabel()
-    {
-        var composition = GetVisibleImeComposition();
-        return _editingLabel[.._editingCaretIndex] + composition + _editingLabel[_editingCaretIndex..];
-    }
+        => _textBoxController.GetDisplayText();
 
     private int GetEditingDisplayCaretIndex()
-        => _editingCaretIndex + GetVisibleImeComposition().Length;
-
-    private string GetVisibleImeComposition()
-    {
-        if (string.IsNullOrEmpty(_imeCompositionLabel))
-        {
-            return string.Empty;
-        }
-
-        var availableLength = Math.Max(0, 24 - _editingLabel.Length);
-        return _imeCompositionLabel.Length <= availableLength
-            ? _imeCompositionLabel
-            : _imeCompositionLabel[..availableLength];
-    }
+        => _textBoxController.GetDisplayCaretIndex();
 
     private void HandleKeyboard(KeyboardState keyboard, MouseState mouse)
     {
@@ -811,9 +787,7 @@ public class Game1 : Game
         _draggedHandleTransition = null;
         _draggedHandleKind = TransitionHandleKind.None;
         _resizedNode = null;
-        _editingLabel = string.Empty;
-        _imeCompositionLabel = string.Empty;
-        _editingCaretIndex = 0;
+        _textBoxController.Clear();
         _isPanning = false;
         _isExportSelecting = false;
         _exportSelectionDragging = false;
@@ -1285,54 +1259,21 @@ public class Game1 : Game
         => $"{DateTime.Now:yyyyMMddHHmmss}_diagram.png";
     private void HandleLabelEditingKeyboard(KeyboardState keyboard)
     {
-        if (!string.IsNullOrEmpty(_imeCompositionLabel))
+        switch (_textBoxController.HandleKeyboard(keyboard, _previousKeyboard))
         {
-            return;
-        }
-
-        if (IsNewKeyPress(keyboard, Keys.Enter))
-        {
-            CommitLabelEdit();
-            return;
-        }
-        if (IsNewKeyPress(keyboard, Keys.Escape))
-        {
-            CancelLabelEdit();
-            return;
-        }
-        if (IsNewKeyPress(keyboard, Keys.Left) && _editingCaretIndex > 0)
-        {
-            _editingCaretIndex--;
-        }
-        if (IsNewKeyPress(keyboard, Keys.Right) && _editingCaretIndex < _editingLabel.Length)
-        {
-            _editingCaretIndex++;
-        }
-        if (IsNewKeyPress(keyboard, Keys.Home))
-        {
-            _editingCaretIndex = 0;
-        }
-        if (IsNewKeyPress(keyboard, Keys.End))
-        {
-            _editingCaretIndex = _editingLabel.Length;
-        }
-        if (IsNewKeyPress(keyboard, Keys.Back) && _editingCaretIndex > 0)
-        {
-            _editingLabel = _editingLabel.Remove(_editingCaretIndex - 1, 1);
-            _editingCaretIndex--;
-        }
-        if (IsNewKeyPress(keyboard, Keys.Delete) && _editingCaretIndex < _editingLabel.Length)
-        {
-            _editingLabel = _editingLabel.Remove(_editingCaretIndex, 1);
+            case TextBoxKeyboardAction.Commit:
+                CommitLabelEdit();
+                break;
+            case TextBoxKeyboardAction.Cancel:
+                CancelLabelEdit();
+                break;
         }
     }
     private void BeginLabelEdit(DiagramNode node)
     {
         _editingNode = node;
         _editingTransition = null;
-        _editingLabel = node.Label;
-        _editingCaretIndex = _editingLabel.Length;
-        _imeCompositionLabel = string.Empty;
+        _textBoxController.Begin(node.Label);
         _draggedNode = null;
         _resizedNode = null;
         _linkSource = null;
@@ -1353,9 +1294,7 @@ public class Game1 : Game
 
         _editingNode = null;
         _editingTransition = transition;
-        _editingLabel = transition.Label;
-        _editingCaretIndex = _editingLabel.Length;
-        _imeCompositionLabel = string.Empty;
+        _textBoxController.Begin(transition.Label);
         _draggedNode = null;
         _resizedNode = null;
         _linkSource = null;
@@ -1363,7 +1302,7 @@ public class Game1 : Game
     }
     private void CommitLabelEdit()
     {
-        var label = _editingLabel.Trim();
+        var label = _textBoxController.Text.Trim();
         if (_editingNode is not null)
         {
             var newLabel = string.IsNullOrWhiteSpace(label) ? $"状態{_editingNode.Id}" : label;
@@ -1390,17 +1329,13 @@ public class Game1 : Game
         }
         _editingNode = null;
         _editingTransition = null;
-        _editingLabel = string.Empty;
-        _imeCompositionLabel = string.Empty;
-        _editingCaretIndex = 0;
+        _textBoxController.Clear();
     }
     private void CancelLabelEdit()
     {
         _editingNode = null;
         _editingTransition = null;
-        _editingLabel = string.Empty;
-        _imeCompositionLabel = string.Empty;
-        _editingCaretIndex = 0;
+        _textBoxController.Clear();
         _status = "ラベル編集をキャンセルしました。";
     }
     private void ToggleTransitionLabelSide(DiagramTransition transition)
@@ -1880,9 +1815,7 @@ public class Game1 : Game
         _draggedHandleTransition = null;
         _draggedHandleKind = TransitionHandleKind.None;
         _resizedNode = null;
-        _editingLabel = string.Empty;
-        _imeCompositionLabel = string.Empty;
-        _editingCaretIndex = 0;
+        _textBoxController.Clear();
         _pendingHistorySnapshot = null;
         _cameraOffset = Vector2.Zero;
         _isPanning = false;
