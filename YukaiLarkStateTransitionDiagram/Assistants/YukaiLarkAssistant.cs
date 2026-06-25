@@ -162,11 +162,11 @@ internal sealed class YukaiLarkAssistant
 
         if (_completedKind != YukaiLarkAssistKind.None && _completedAssistSeconds > 0)
         {
-            DrawCompletedAssistBubble(spriteBatch, pixel, target, _completedKind, theme, drawRectangleOutline, drawUiText);
+            DrawCompletedAssistBubble(spriteBatch, pixel, viewport, target, _completedKind, theme, drawRectangleOutline, drawUiText);
         }
         else if (IsAssistReady && assistKind != YukaiLarkAssistKind.None)
         {
-            DrawAssistBubble(spriteBatch, pixel, target, assistKind, context, theme, drawRectangleOutline, drawUiText);
+            DrawAssistBubble(spriteBatch, pixel, viewport, target, assistKind, context, theme, drawRectangleOutline, drawUiText);
         }
     }
 
@@ -259,6 +259,7 @@ internal sealed class YukaiLarkAssistant
     private static void DrawAssistBubble(
         SpriteBatch spriteBatch,
         Texture2D pixel,
+        Viewport viewport,
         Rectangle mascotBounds,
         YukaiLarkAssistKind kind,
         YukaiLarkAssistantContext context,
@@ -267,13 +268,13 @@ internal sealed class YukaiLarkAssistant
         DrawUiText drawUiText)
     {
         const int bubbleWidth = 376;
-        const int bubbleHeight = 78;
+        const int bubbleHeight = 50;
         var bubble = new Rectangle(mascotBounds.X - bubbleWidth + 18, mascotBounds.Y + 22, bubbleWidth, bubbleHeight);
         var (title, body) = GetBubbleText(kind, context);
         spriteBatch.Draw(pixel, bubble, theme.AssistantBubbleColor);
         drawRectangleOutline(bubble, theme.AssistantBubbleBorderColor, 2);
-        drawUiText(title, new Vector2(bubble.X + 12, bubble.Y + 10), theme.AssistantTitleTextColor, 17, true);
-        drawUiText(body, new Vector2(bubble.X + 12, bubble.Y + 40), theme.AssistantBodyTextColor, 15, false);
+        drawUiText(title, new Vector2(bubble.X + 12, bubble.Y + 13), theme.AssistantTitleTextColor, 17, true);
+        DrawAssistantCutIn(spriteBatch, pixel, viewport, mascotBounds, body, string.Empty, theme, drawRectangleOutline, drawUiText);
     }
 
     private static (string Title, string Body) GetBubbleText(YukaiLarkAssistKind kind, YukaiLarkAssistantContext context)
@@ -306,6 +307,7 @@ internal sealed class YukaiLarkAssistant
     private static void DrawCompletedAssistBubble(
         SpriteBatch spriteBatch,
         Texture2D pixel,
+        Viewport viewport,
         Rectangle mascotBounds,
         YukaiLarkAssistKind kind,
         BoardTheme theme,
@@ -313,14 +315,53 @@ internal sealed class YukaiLarkAssistant
         DrawUiText drawUiText)
     {
         const int bubbleWidth = 430;
-        const int bubbleHeight = 104;
+        const int bubbleHeight = 50;
         var bubble = new Rectangle(mascotBounds.X - bubbleWidth + 18, mascotBounds.Y + 18, bubbleWidth, bubbleHeight);
         var (title, action, hint) = GetCompletedBubbleText(kind);
         spriteBatch.Draw(pixel, bubble, theme.AssistantBubbleColor);
         drawRectangleOutline(bubble, theme.AssistantCompletedBubbleBorderColor, 2);
-        drawUiText(title, new Vector2(bubble.X + 12, bubble.Y + 10), theme.AssistantTitleTextColor, 17, true);
-        drawUiText(action, new Vector2(bubble.X + 12, bubble.Y + 38), theme.AssistantBodyTextColor, 15, false);
-        drawUiText(hint, new Vector2(bubble.X + 12, bubble.Y + 66), theme.AssistantHintTextColor, 14, false);
+        drawUiText(title, new Vector2(bubble.X + 12, bubble.Y + 13), theme.AssistantTitleTextColor, 17, true);
+        DrawAssistantCutIn(spriteBatch, pixel, viewport, mascotBounds, action, hint, theme, drawRectangleOutline, drawUiText);
+    }
+
+    private static void DrawAssistantCutIn(
+        SpriteBatch spriteBatch,
+        Texture2D pixel,
+        Viewport viewport,
+        Rectangle mascotBounds,
+        string primaryText,
+        string secondaryText,
+        BoardTheme theme,
+        DrawRectangleOutline drawRectangleOutline,
+        DrawUiText drawUiText)
+    {
+        if (string.IsNullOrWhiteSpace(primaryText) && string.IsNullOrWhiteSpace(secondaryText))
+        {
+            return;
+        }
+
+        var hasSecondaryText = !string.IsNullOrWhiteSpace(secondaryText);
+        var bandHeight = hasSecondaryText ? 76 : 56;
+        var y = Math.Clamp(mascotBounds.Bottom + 16, 86, viewport.Height - bandHeight - 72);
+        var band = new Rectangle(0, y, viewport.Width, bandHeight);
+        var frameWidth = Math.Min(760, Math.Max(420, viewport.Width - 112));
+        var frame = new Rectangle((viewport.Width - frameWidth) / 2, y + 7, frameWidth, bandHeight - 14);
+        var accent = hasSecondaryText
+            ? theme.AssistantCompletedBubbleBorderColor
+            : theme.AssistantBubbleBorderColor;
+
+        spriteBatch.Draw(pixel, new Rectangle(0, y + 5, viewport.Width, bandHeight), new Color(0, 0, 0, 72));
+        spriteBatch.Draw(pixel, band, new Color(0, 0, 0, 166));
+        spriteBatch.Draw(pixel, new Rectangle(0, band.Y, viewport.Width, 1), accent);
+        spriteBatch.Draw(pixel, new Rectangle(0, band.Bottom - 1, viewport.Width, 1), accent);
+        spriteBatch.Draw(pixel, frame, new Color(10, 12, 14, 94));
+        drawRectangleOutline(frame, accent, 1);
+
+        drawUiText(primaryText, new Vector2(frame.X + 18, frame.Y + 8), new Color(255, 248, 220), 15, true);
+        if (hasSecondaryText)
+        {
+            drawUiText(secondaryText, new Vector2(frame.X + 18, frame.Y + 34), new Color(224, 236, 232), 14, false);
+        }
     }
 
     private static (string Title, string Action, string Hint) GetCompletedBubbleText(YukaiLarkAssistKind kind)
