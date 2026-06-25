@@ -96,6 +96,7 @@ public class Game1 : Game
     private Vector2 _cameraOffset;
     private Vector2 _panStartMouse;
     private Vector2 _panStartCamera;
+    private MouseCursor? _currentMouseCursor;
     private bool _isPanning;
     private bool _isExportSelecting;
     private bool _isFileMenuOpen;
@@ -157,6 +158,7 @@ public class Game1 : Game
         {
             HandleFileMenuKeyboard(keyboard);
             HandleFileMenuMouse(mouse);
+            UpdateMouseCursor(keyboard, mouse);
             _previousKeyboard = keyboard;
             _previousMouse = mouse;
             base.Update(gameTime);
@@ -189,6 +191,7 @@ public class Game1 : Game
             HandleKeyboard(keyboard, mouse);
             HandleMouse(keyboard, mouse);
         }
+        UpdateMouseCursor(keyboard, mouse);
         _previousKeyboard = keyboard;
         _previousMouse = mouse;
         base.Update(gameTime);
@@ -1488,6 +1491,55 @@ public class Game1 : Game
                 _status = "表示位置を移動しました。空白をドラッグするとまた移動できます。";
             }
         }
+    }
+    private void UpdateMouseCursor(KeyboardState keyboard, MouseState mouse)
+    {
+        var cursor = GetMouseCursor(keyboard, mouse);
+        if (ReferenceEquals(_currentMouseCursor, cursor))
+        {
+            return;
+        }
+
+        Mouse.SetCursor(cursor);
+        _currentMouseCursor = cursor;
+    }
+
+    private MouseCursor GetMouseCursor(KeyboardState keyboard, MouseState mouse)
+    {
+        if (_isPanning)
+        {
+            return MouseCursor.SizeAll;
+        }
+
+        if (_isFileMenuOpen || _isExportSelecting || IsEditingLabel)
+        {
+            return MouseCursor.Arrow;
+        }
+
+        if (CanPanFromMousePosition(keyboard, mouse))
+        {
+            return MouseCursor.Hand;
+        }
+
+        return MouseCursor.Arrow;
+    }
+
+    private bool CanPanFromMousePosition(KeyboardState keyboard, MouseState mouse)
+    {
+        if (mouse.LeftButton == ButtonState.Pressed
+            || _draggedNode is not null
+            || _resizedNode is not null
+            || _draggedHandleTransition is not null
+            || _linkSource is not null
+            || IsShiftDown(keyboard))
+        {
+            return false;
+        }
+
+        var mousePosition = ScreenToWorld(mouse.Position.ToVector2());
+        return FindNodeAt(mousePosition) is null
+            && FindTransitionAt(mousePosition) is null
+            && FindTransitionHandleAt(mousePosition).Transition is null;
     }
     private void AddNode(Vector2 position)
     {
