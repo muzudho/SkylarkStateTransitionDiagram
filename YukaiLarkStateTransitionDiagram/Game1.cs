@@ -1728,6 +1728,12 @@ public class Game1 : Game
             return;
         }
 
+        if (target is not null && !CanEndTransitionAt(target))
+        {
+            _status = "開始マークは出発専用です。開始マークへ遷移は伸ばせません。";
+            return;
+        }
+
         if (source?.Kind == NodeKind.StartMarker && target?.Kind == NodeKind.EndMarker)
         {
             _status = "開始マークから終了マークへ直接はつなげません。先にNで状態を追加してください。";
@@ -2800,6 +2806,9 @@ public class Game1 : Game
 
     private static bool CanStartTransitionFrom(DiagramNode node)
         => node.Kind != NodeKind.EndMarker;
+
+    private static bool CanEndTransitionAt(DiagramNode node)
+        => node.Kind != NodeKind.StartMarker;
 
     private Texture2D GetLabelTexture(string label, bool editing)
     {
