@@ -3022,6 +3022,11 @@ public sealed record BoardTheme(
     public Color AssistantTitleTextColor => IsLightBackground ? TransitionLabelColor : SelectedTransitionLabelColor;
     public Color AssistantBodyTextColor => IsLightBackground ? PanelSecondaryTextColor : Blend(SelectedTransitionLabelColor, TransitionLabelColor, 0.28f);
     public Color AssistantHintTextColor => IsLightBackground ? PanelMutedTextColor : Blend(SelectedTransitionLabelColor, BackgroundColor, 0.26f);
+    public Color AssistantCutInShadowColor => WithAlpha(Blend(BackgroundColor, Color.Black, IsLightBackground ? 0.28f : 0.46f), 72);
+    public Color AssistantCutInBandColor => WithAlpha(Blend(BackgroundColor, GridColor, IsLightBackground ? 0.42f : 0.28f), 166);
+    public Color AssistantCutInFrameColor => WithAlpha(Blend(BackgroundColor, PhotoPaperColor, IsLightBackground ? 0.18f : 0.12f), 94);
+    public Color AssistantCutInPrimaryTextColor => IsLightBackground ? TransitionLabelColor : SelectedTransitionLabelColor;
+    public Color AssistantCutInSecondaryTextColor => IsLightBackground ? PanelSecondaryTextColor : Blend(SelectedTransitionLabelColor, TransitionLabelColor, 0.22f);
     public Color StartMarkerFlowIconColor => WithAlpha(GridColor, 176);
     public Color StartMarkerFlowIconSelectedColor => WithAlpha(GridColor, 232);
     public Color StartMarkerFlowIconShadowColor => WithAlpha(IsLightBackground ? Color.White : Color.Black, 82);

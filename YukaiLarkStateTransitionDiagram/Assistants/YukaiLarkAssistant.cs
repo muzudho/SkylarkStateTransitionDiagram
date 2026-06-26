@@ -358,17 +358,17 @@ internal sealed class YukaiLarkAssistant
             ? theme.AssistantCompletedBubbleBorderColor
             : theme.AssistantBubbleBorderColor;
 
-        spriteBatch.Draw(pixel, new Rectangle(0, y + 5, viewport.Width, bandHeight), new Color(0, 0, 0, 72));
-        spriteBatch.Draw(pixel, band, new Color(0, 0, 0, 166));
+        spriteBatch.Draw(pixel, new Rectangle(0, y + 5, viewport.Width, bandHeight), theme.AssistantCutInShadowColor);
+        spriteBatch.Draw(pixel, band, theme.AssistantCutInBandColor);
         spriteBatch.Draw(pixel, new Rectangle(0, band.Y, viewport.Width, 1), accent);
         spriteBatch.Draw(pixel, new Rectangle(0, band.Bottom - 1, viewport.Width, 1), accent);
-        spriteBatch.Draw(pixel, frame, new Color(10, 12, 14, 94));
+        spriteBatch.Draw(pixel, frame, theme.AssistantCutInFrameColor);
         drawRectangleOutline(frame, accent, 1);
 
-        drawUiText(primaryText, new Vector2(frame.X + 18, frame.Y + 8), new Color(255, 248, 220), 15, true);
+        drawUiText(primaryText, new Vector2(frame.X + 18, frame.Y + 8), theme.AssistantCutInPrimaryTextColor, 15, true);
         if (hasSecondaryText)
         {
-            drawUiText(secondaryText, new Vector2(frame.X + 18, frame.Y + 34), new Color(224, 236, 232), 14, false);
+            drawUiText(secondaryText, new Vector2(frame.X + 18, frame.Y + 34), theme.AssistantCutInSecondaryTextColor, 14, false);
         }
     }
 
