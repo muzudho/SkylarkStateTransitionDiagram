@@ -1450,6 +1450,13 @@ public class Game1 : Game
             }
             if (shiftDown && node is not null)
             {
+                if (!CanStartTransitionFrom(node))
+                {
+                    _linkSource = null;
+                    _status = "終了マークは到着専用です。終了マークから遷移は伸ばせません。";
+                    return;
+                }
+
                 _linkSource = node;
                 _status = "遷移を作成中です。接続先の状態でマウスを離してください。";
                 return;
@@ -1715,6 +1722,12 @@ public class Game1 : Game
     {
         var source = FindNode(sourceId);
         var target = FindNode(targetId);
+        if (source is not null && !CanStartTransitionFrom(source))
+        {
+            _status = "終了マークは到着専用です。終了マークから遷移は伸ばせません。";
+            return;
+        }
+
         if (source?.Kind == NodeKind.StartMarker && target?.Kind == NodeKind.EndMarker)
         {
             _status = "開始マークから終了マークへ直接はつなげません。先にNで状態を追加してください。";
@@ -2784,6 +2797,10 @@ public class Game1 : Game
         var target = FindNode(transition.TargetId);
         return source?.Kind != NodeKind.StartMarker || target?.Kind != NodeKind.Normal;
     }
+
+    private static bool CanStartTransitionFrom(DiagramNode node)
+        => node.Kind != NodeKind.EndMarker;
+
     private Texture2D GetLabelTexture(string label, bool editing)
     {
         var cacheKey = $"{(editing ? "edit" : "label")}|{label}";
