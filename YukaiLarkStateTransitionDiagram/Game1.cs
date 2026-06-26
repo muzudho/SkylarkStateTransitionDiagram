@@ -2271,7 +2271,8 @@ public class Game1 : Game
                     transition == _editingTransition,
                     editingDisplayLabel,
                     editingDisplayCaretIndex,
-                    showEditingCaret);
+                    showEditingCaret,
+                    !CanTransitionHaveEvent(transition));
             }
         }
         if (includeInteraction)
@@ -3021,12 +3022,18 @@ public sealed record BoardTheme(
     public Color AssistantTitleTextColor => IsLightBackground ? TransitionLabelColor : SelectedTransitionLabelColor;
     public Color AssistantBodyTextColor => IsLightBackground ? PanelSecondaryTextColor : Blend(SelectedTransitionLabelColor, TransitionLabelColor, 0.28f);
     public Color AssistantHintTextColor => IsLightBackground ? PanelMutedTextColor : Blend(SelectedTransitionLabelColor, BackgroundColor, 0.26f);
+    public Color StartMarkerFlowIconColor => WithAlpha(GridColor, 176);
+    public Color StartMarkerFlowIconSelectedColor => WithAlpha(GridColor, 232);
+    public Color StartMarkerFlowIconShadowColor => WithAlpha(IsLightBackground ? Color.White : Color.Black, 82);
 
     private static float GetLuminance(Color color)
         => ((0.2126f * color.R) + (0.7152f * color.G) + (0.0722f * color.B)) / 255f;
 
     private static Color WithAlpha(Color color, byte alpha)
         => new(color.R, color.G, color.B, alpha);
+
+    private static Color GetReadableForeground(Color background)
+        => GetLuminance(background) >= 0.55f ? new Color(16, 18, 22) : new Color(255, 255, 255);
 
     private static Color Blend(Color from, Color to, float amount)
     {
@@ -3129,3 +3136,4 @@ public static class PrimitiveText
         }
     }
 }
+

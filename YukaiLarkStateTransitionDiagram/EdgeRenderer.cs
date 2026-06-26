@@ -48,13 +48,21 @@ public sealed class EdgeRenderer
         bool editing,
         string editingLabel,
         int editingCaretIndex,
-        bool showEditingCaret)
+        bool showEditingCaret,
+        bool drawStartMarkerFlowIcon)
     {
         var lineColor = selected ? Theme.SelectedTransitionLineColor : Theme.TransitionLineColor;
         var thickness = selected ? 4f : 3f;
 
         DrawBezierArrow(start, control1, control2, end, lineColor, thickness);
-        DrawTransitionLabel(transition, start, control1, control2, end, selected, editing, editingLabel, editingCaretIndex, showEditingCaret);
+        if (drawStartMarkerFlowIcon)
+        {
+            DrawStartMarkerFlowIcon(start, control1, control2, end, transition.LabelSide, selected);
+        }
+        else
+        {
+            DrawTransitionLabel(transition, start, control1, control2, end, selected, editing, editingLabel, editingCaretIndex, showEditingCaret);
+        }
     }
 
     /// <summary>
@@ -162,6 +170,43 @@ public sealed class EdgeRenderer
         _spriteBatch.Draw(texture, position, labelColor);
     }
 
+    private void DrawStartMarkerFlowIcon(Vector2 start, Vector2 control1, Vector2 control2, Vector2 end, int labelSide, bool selected)
+    {
+        var center = GetTransitionLabelCenter(start, control1, control2, end, labelSide, 44, 28);
+        var tangent = CubicBezierTangent(start, control1, control2, end, 0.5f);
+        var directionSource = tangent.LengthSquared() > 0.01f ? tangent : end - start;
+        var direction = directionSource.LengthSquared() > 0.01f
+            ? Vector2.Normalize(directionSource)
+            : Vector2.UnitX;
+        var normal = new Vector2(-direction.Y, direction.X);
+        var glyphColor = selected ? Theme.StartMarkerFlowIconSelectedColor : Theme.StartMarkerFlowIconColor;
+        var shadowColor = Theme.StartMarkerFlowIconShadowColor;
+        var shadowOffset = new Vector2(1f, 1f);
+
+        for (var i = -1; i <= 1; i++)
+        {
+            var tip = center + direction * (i * 11f + 7f);
+            var baseCenter = tip - direction * 10f;
+            var wingA = baseCenter + normal * 7f;
+            var wingB = baseCenter - normal * 7f;
+
+            DrawFilledTriangle(tip + shadowOffset, wingA + shadowOffset, wingB + shadowOffset, shadowColor);
+            DrawFilledTriangle(tip, wingA, wingB, glyphColor);
+        }
+    }
+
+    private void DrawFilledTriangle(Vector2 tip, Vector2 wingA, Vector2 wingB, Color color)
+    {
+        const int steps = 10;
+        for (var i = 0; i <= steps; i++)
+        {
+            var amount = i / (float)steps;
+            var left = Vector2.Lerp(tip, wingA, amount);
+            var right = Vector2.Lerp(tip, wingB, amount);
+            _primitiveRenderer.DrawLine(left, right, color, 2f);
+        }
+    }
+
     /// <summary>
     /// 作成前、または編集中のイベント入力欄を描画します。
     /// </summary>
@@ -230,16 +275,19 @@ public sealed class EdgeRenderer
     /// <param name="labelTexture"></param>
     /// <returns></returns>
     private static Vector2 GetTransitionLabelCenter(Vector2 start, Vector2 control1, Vector2 control2, Vector2 end, int labelSide, Texture2D labelTexture)
+        => GetTransitionLabelCenter(start, control1, control2, end, labelSide, labelTexture.Width, labelTexture.Height);
+
+    private static Vector2 GetTransitionLabelCenter(Vector2 start, Vector2 control1, Vector2 control2, Vector2 end, int labelSide, int labelWidth, int labelHeight)
     {
         var midpoint = CubicBezier(start, control1, control2, end, 0.5f);
         var tangent = CubicBezierTangent(start, control1, control2, end, 0.5f);
         var side = labelSide == 0 ? -1f : 1f;
         if (MathF.Abs(tangent.X) >= MathF.Abs(tangent.Y))
         {
-            return midpoint + new Vector2(0, side * (labelTexture.Height / 2f + 18f));
+            return midpoint + new Vector2(0, side * (labelHeight / 2f + 18f));
         }
 
-        return midpoint + new Vector2(side * (labelTexture.Width / 2f + 22f), 0);
+        return midpoint + new Vector2(side * (labelWidth / 2f + 22f), 0);
     }
 
     /// <summary>
@@ -380,3 +428,4 @@ public sealed class EdgeRenderer
             + 3f * t * t * (end - control2);
     }
 }
+
