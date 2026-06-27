@@ -3,6 +3,7 @@ namespace YukaiLarkStateTransitionDiagram;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using YukaiLarkStateTransitionDiagram.Persistence;
 using YukaiLarkStateTransitionDiagram.Theme;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -65,8 +66,9 @@ public partial class Game1
     private void ConfirmThemeMenu()
     {
         var confirmedTheme = _keyCapTheme;
+        SaveSelectedTheme(confirmedTheme);
         CloseThemeMenu();
-        _status = $"テーマを {confirmedTheme.Name} に決定しました。";
+        _status = $"テーマを {confirmedTheme.Name} に決定しました。次回起動時にもこのテーマを使います。";
     }
 
     private void CancelThemeMenu()
@@ -382,6 +384,34 @@ public partial class Game1
         {
             _status = $"テーマ {shortcutIndex}: {nextTheme.Name} を選択中です。";
         }
+    }
+
+    private void ApplyConfiguredTheme()
+    {
+        _keyCapTheme = FindThemeByName(_appConfig.SelectedThemeName);
+        _boardTheme = BoardThemes.ForKeyCapTheme(_keyCapTheme);
+    }
+
+    private static IKeyCapTheme FindThemeByName(string? themeName)
+    {
+        if (!string.IsNullOrWhiteSpace(themeName))
+        {
+            foreach (var theme in KeyCapThemes.AllThemes)
+            {
+                if (string.Equals(theme.Name, themeName, StringComparison.OrdinalIgnoreCase))
+                {
+                    return theme;
+                }
+            }
+        }
+
+        return KeyCapThemes.YukaiLark;
+    }
+
+    private void SaveSelectedTheme(IKeyCapTheme theme)
+    {
+        _appConfig.SelectedThemeName = theme.Name;
+        AppConfigStore.Save(_appConfig);
     }
 
     private void ApplyKeyCapTheme(IKeyCapTheme theme)

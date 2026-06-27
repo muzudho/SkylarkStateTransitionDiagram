@@ -77,6 +77,7 @@ public partial class Game1 : Game
     protected override void Initialize()
     {
         _appConfig = AppConfigStore.Load();
+        ApplyConfiguredTheme();
         ClearDiagram();
         ClearHistory();
         OpenFileMenu(isStartup: true);
@@ -635,4 +636,5 @@ public static class PrimitiveText
         }
     }
 }
+
 

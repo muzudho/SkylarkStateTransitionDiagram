@@ -15,8 +15,10 @@ using System.Text.Unicode;
 public sealed class AppConfig
 {
     public const int MaxRecentFiles = 10;
+    public const string DefaultThemeName = "YukaiLark";
 
     public string? LastOpenedFile { get; set; }
+    public string SelectedThemeName { get; set; } = DefaultThemeName;
     public List<string> RecentFiles { get; set; } = new();
 
     public void AddRecentFile(string path)
@@ -62,6 +64,10 @@ public static class AppConfigStore
 
             var json = File.ReadAllText(ConfigPath, Encoding.UTF8);
             var config = JsonSerializer.Deserialize<AppConfig>(json, Options) ?? new AppConfig();
+            if (string.IsNullOrWhiteSpace(config.SelectedThemeName))
+            {
+                config.SelectedThemeName = AppConfig.DefaultThemeName;
+            }
             config.RecentFiles = (config.RecentFiles ?? new List<string>())
                 .Where(file => !string.IsNullOrWhiteSpace(file))
                 .Select(Path.GetFullPath)
