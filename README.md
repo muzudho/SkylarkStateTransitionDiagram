@@ -17,11 +17,11 @@
 アプリを試す場合は、GitHub Releases から最新版をダウンロードしてください。
 
 - [最新版のリリースページ](https://github.com/muzudho/YukaiLarkStateTransitionDiagram/releases/latest)
-- [v0.6.0 のリリースページ](https://github.com/muzudho/YukaiLarkStateTransitionDiagram/releases/tag/v0.6.0)
+- [v0.6.1 のリリースページ](https://github.com/muzudho/YukaiLarkStateTransitionDiagram/releases/tag/v0.6.1)
 
 Windows で使う場合は、リリースページの **Assets** から次のファイルをダウンロードしてください。
 
-- `YukaiLarkStateTransitionDiagram-v0.6.0-win-x64.zip`
+- `YukaiLarkStateTransitionDiagram-v0.6.1-win-x64.zip`
 
 ダウンロード後、zip ファイルを展開して、中にある実行ファイルを起動してください。
 
