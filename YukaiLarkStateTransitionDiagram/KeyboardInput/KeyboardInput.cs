@@ -147,11 +147,7 @@ public partial class Game1
         {
             if (_selectedNode.Kind == NodeKind.Normal)
             {
-                ExecuteUndoableChange(() =>
-                {
-                    _selectedNode.ColorIndex = (_selectedNode.ColorIndex + 1) % _boardTheme.NormalNodePalette.Length;
-                });
-                _status = "選択中の状態色を切り替えました。";
+                OpenColorPalette();
             }
             else
             {

@@ -21,6 +21,23 @@ public sealed record BoardTheme(
 {
     public const int NormalNodePaletteLength = 6;
 
+    public BoardTheme WithNormalNodePaletteOverride(Color[]? palette)
+        => new(
+            BackgroundColor,
+            GridColor,
+            ExportBackdropColor,
+            PhotoPaperColor,
+            PhotoEdgeColor,
+            PinColor,
+            TransitionLineColor,
+            TransitionLabelColor,
+            SelectedTransitionLineColor,
+            SelectedTransitionLabelColor,
+            TransitionHandleColor,
+            TransitionControlHandleColor,
+            TransitionGuideColor,
+            palette);
+
     public Color[] NormalNodePalette { get; } = NormalizeNormalNodePalette(
         NormalNodePaletteOverride,
         CreateNormalNodePalette(

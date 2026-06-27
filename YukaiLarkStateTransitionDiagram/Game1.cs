@@ -128,6 +128,20 @@ public partial class Game1 : Game
             return;
         }
 
+        if (_isColorPaletteOpen)
+        {
+            HandleColorPaletteKeyboard(keyboard);
+            var paletteConsumedMouse = HandleColorPaletteMouse(mouse);
+            if (_isColorPaletteOpen && !paletteConsumedMouse)
+            {
+                HandleMouse(keyboard, mouse);
+            }
+            UpdateMouseCursor(keyboard, mouse);
+            _previousKeyboard = keyboard;
+            _previousMouse = mouse;
+            base.Update(gameTime);
+            return;
+        }
         // ［開始マーク作成アシスト］の起動判定
         _status = _yukaiLarkAssistant.Update(gameTime, CreateAssistantContext(), _status, DefaultStatus);
 
@@ -192,6 +206,7 @@ public partial class Game1 : Game
             DrawBottomShortcutHelp(gameTime);
         }
 
+        DrawColorPaletteOverlay();
         DrawExportSelectionOverlay();
         DrawExportPhotoEffectOverlay();
         DrawThemeMenuOverlay();
@@ -643,5 +658,3 @@ public static class PrimitiveText
         }
     }
 }
-
-

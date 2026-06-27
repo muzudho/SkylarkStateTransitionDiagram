@@ -399,7 +399,7 @@ public partial class Game1
     private void ApplyConfiguredTheme()
     {
         _keyCapTheme = FindThemeByName(_appConfig.SelectedThemeName);
-        _boardTheme = BoardThemes.ForKeyCapTheme(_keyCapTheme);
+        _boardTheme = CreateBoardTheme(_keyCapTheme);
     }
 
     private static IKeyCapTheme FindThemeByName(string? themeName)
@@ -424,14 +424,25 @@ public partial class Game1
         AppConfigStore.Save(_appConfig);
     }
 
+    private BoardTheme CreateBoardTheme(IKeyCapTheme theme)
+    {
+        var themeBoard = BoardThemes.ForKeyCapTheme(theme);
+        return themeBoard.WithNormalNodePaletteOverride(_appConfig.GetNormalNodePaletteOverride(theme.Name));
+    }
+
+    private void ApplyCurrentBoardTheme()
+    {
+        _boardTheme = CreateBoardTheme(_keyCapTheme);
+        _edgeRenderer.Theme = _boardTheme;
+        _nodeRenderer.Theme = _boardTheme;
+        _shortcutKeyRenderer.BoardTheme = _boardTheme;
+    }
+
     private void ApplyKeyCapTheme(IKeyCapTheme theme)
     {
         _keyCapTheme = theme;
-        _boardTheme = BoardThemes.ForKeyCapTheme(_keyCapTheme);
-        _edgeRenderer.Theme = _boardTheme;
-        _nodeRenderer.Theme = _boardTheme;
+        ApplyCurrentBoardTheme();
         _shortcutKeyRenderer.KeyCapTheme = _keyCapTheme;
-        _shortcutKeyRenderer.BoardTheme = _boardTheme;
         _status = $"テーマを {_keyCapTheme.Name} に切り替えました。背景とPNG出力にも反映します。";
     }
 }

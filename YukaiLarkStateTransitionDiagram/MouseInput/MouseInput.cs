@@ -570,7 +570,7 @@ public partial class Game1
             return MouseCursor.SizeAll;
         }
 
-        if (_isFileMenuOpen || _isThemeMenuOpen || _isExportSelecting || IsEditingLabel || _isEditingFileName)
+        if (_isFileMenuOpen || _isThemeMenuOpen || _isColorPaletteOpen || _isExportSelecting || IsEditingLabel || _isEditingFileName)
         {
             return MouseCursor.Arrow;
         }
@@ -881,4 +881,3 @@ public partial class Game1
     }
 
 }
-

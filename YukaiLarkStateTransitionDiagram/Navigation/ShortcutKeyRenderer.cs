@@ -262,7 +262,7 @@ public sealed class ShortcutKeyRenderer : IDisposable
 
             if (selectedNode.Kind == NodeKind.Normal)
             {
-                nodeHints.Add(new HelpHint("C", "状態色変更"));
+                nodeHints.Add(new HelpHint("C", "色パレット"));
             }
 
             return
