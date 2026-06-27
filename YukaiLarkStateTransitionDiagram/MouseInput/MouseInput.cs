@@ -842,6 +842,10 @@ public partial class Game1
             return true;
         }
 
+        if (transition.SourceId != transition.TargetId)
+        {
+            return false;
+        }
 
         if (Vector2.Distance(position, control1) <= 14f)
         {

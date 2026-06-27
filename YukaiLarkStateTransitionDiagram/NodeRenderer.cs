@@ -42,14 +42,14 @@ public sealed class NodeRenderer
     {
         var baseFill = node.Kind == NodeKind.Normal && _palette.Length > 0
             ? _palette[node.ColorIndex % _palette.Length]
-            : new Color(5, 6, 8);
+            : Theme.MarkerFillColor;
         var fill = inactive ? GetInactiveColor(baseFill, 0.38f) : baseFill;
         var outerColor = inactive
-            ? GetInactiveColor(selected ? new Color(255, 255, 255) : new Color(10, 12, 16), 0.52f)
-            : selected ? new Color(255, 255, 255) : new Color(10, 12, 16);
-        var outlineColor = inactive ? GetInactiveColor(Color.White, 0.56f) : Color.White;
-        var normalOutlineColor = inactive ? GetInactiveColor(new Color(15, 18, 24), 0.56f) : new Color(15, 18, 24);
-        var labelColor = inactive ? Theme.PanelMutedTextColor * 0.72f : Color.White;
+            ? GetInactiveColor(selected ? Theme.SelectedNodeOuterRingColor : Theme.NodeOuterRingColor, 0.52f)
+            : selected ? Theme.SelectedNodeOuterRingColor : Theme.NodeOuterRingColor;
+        var outlineColor = inactive ? GetInactiveColor(Theme.MarkerOutlineColor, 0.56f) : Theme.MarkerOutlineColor;
+        var normalOutlineColor = inactive ? GetInactiveColor(Theme.NormalNodeOutlineColor, 0.56f) : Theme.NormalNodeOutlineColor;
+        var labelColor = inactive ? Theme.PanelMutedTextColor * 0.72f : Theme.NodeLabelTextColor;
 
         if (selected && !inactive)
         {
@@ -105,9 +105,9 @@ public sealed class NodeRenderer
         var alpha = MathHelper.Clamp(opacity, 0f, 1f);
         _primitiveRenderer.DrawCircle(node.Position, node.Radius + 8f, new Color(110, 185, 230) * (alpha * 0.32f));
         _primitiveRenderer.DrawCircle(node.Position, node.Radius + 4f, new Color(255, 255, 255) * (alpha * 0.34f));
-        _primitiveRenderer.DrawCircle(node.Position, node.Radius, new Color(5, 6, 8) * (alpha * 0.46f));
-        _primitiveRenderer.DrawCircleOutline(node.Position, node.Radius - 1f, Color.White * (alpha * 0.74f), 5f);
-        DrawNodeLabel(node.Label, node.Position, editing: false, Color.White * (alpha * 0.74f));
+        _primitiveRenderer.DrawCircle(node.Position, node.Radius, Theme.MarkerFillColor * (alpha * 0.46f));
+        _primitiveRenderer.DrawCircleOutline(node.Position, node.Radius - 1f, Theme.MarkerOutlineColor * (alpha * 0.74f), 5f);
+        DrawNodeLabel(node.Label, node.Position, editing: false, Theme.NodeLabelTextColor * (alpha * 0.74f));
     }
 
     /// <summary>
@@ -125,8 +125,8 @@ public sealed class NodeRenderer
         _primitiveRenderer.DrawCircle(node.Position, node.Radius + 8f, fill * (alpha * 0.26f));
         _primitiveRenderer.DrawCircle(node.Position, node.Radius + 4f, new Color(255, 255, 255) * (alpha * 0.3f));
         _primitiveRenderer.DrawCircle(node.Position, node.Radius, fill * (alpha * 0.54f));
-        _primitiveRenderer.DrawCircleOutline(node.Position, node.Radius, new Color(15, 18, 24) * (alpha * 0.72f), 3f);
-        DrawNodeLabel(node.Label, node.Position, editing: false, Color.White * (alpha * 0.78f));
+        _primitiveRenderer.DrawCircleOutline(node.Position, node.Radius, Theme.NormalNodeOutlineColor * (alpha * 0.72f), 3f);
+        DrawNodeLabel(node.Label, node.Position, editing: false, Theme.NodeLabelTextColor * (alpha * 0.78f));
     }
 
     /// <summary>

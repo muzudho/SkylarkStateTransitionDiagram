@@ -160,6 +160,13 @@ public sealed class EdgeRenderer
         _primitiveRenderer.DrawHandle(control2, Theme.TransitionControlHandleColor);
     }
 
+
+    public void DrawTransitionEndpointHandles(Vector2 start, Vector2 end)
+    {
+        _primitiveRenderer.DrawHandle(start, Theme.TransitionHandleColor);
+        _primitiveRenderer.DrawHandle(end, Theme.TransitionHandleColor);
+    }
+
     /// <summary>
     /// ベジェ曲線の矢印を描く
     /// </summary>

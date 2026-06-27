@@ -44,6 +44,25 @@ public sealed record BoardTheme(
         ? WithAlpha(PhotoPaperColor, 220)
         : WithAlpha(Blend(BackgroundColor, Color.Black, 0.14f), 218);
 
+    public Color NodeOuterRingColor => IsLightBackground
+        ? WithAlpha(Blend(TransitionLabelColor, BackgroundColor, 0.10f), 245)
+        : WithAlpha(Blend(PhotoPaperColor, BackgroundColor, 0.32f), 238);
+    public Color SelectedNodeOuterRingColor => IsLightBackground
+        ? WithAlpha(SelectedTransitionLineColor, 245)
+        : WithAlpha(PhotoPaperColor, 245);
+    public Color NormalNodeOutlineColor => IsLightBackground
+        ? WithAlpha(Blend(TransitionLabelColor, BackgroundColor, 0.04f), 245)
+        : WithAlpha(Blend(TransitionLineColor, PhotoPaperColor, 0.18f), 238);
+    public Color MarkerFillColor => IsLightBackground
+        ? Blend(BackgroundColor, Color.Black, 0.82f)
+        : Blend(BackgroundColor, Color.Black, 0.38f);
+    public Color MarkerOutlineColor => IsLightBackground
+        ? WithAlpha(TransitionLineColor, 245)
+        : WithAlpha(PhotoPaperColor, 245);
+    public Color NodeLabelTextColor => IsLightBackground
+        ? PhotoPaperColor
+        : WithAlpha(PhotoPaperColor, 248);
+
     public Color AssistantBubbleColor => IsLightBackground
         ? WithAlpha(PhotoPaperColor, 238)
         : WithAlpha(Blend(BackgroundColor, GridColor, 0.58f), 238);

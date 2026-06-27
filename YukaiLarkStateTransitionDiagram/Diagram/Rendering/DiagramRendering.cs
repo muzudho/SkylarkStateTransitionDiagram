@@ -233,7 +233,14 @@ public partial class Game1
             }
             else if (TryGetTransitionGeometry(_selectedTransition, out var start, out var control1, out var control2, out var end))
             {
-                _edgeRenderer.DrawTransitionHandles(start, control1, control2, end);
+                if (_selectedTransition.SourceId == _selectedTransition.TargetId)
+                {
+                    _edgeRenderer.DrawTransitionHandles(start, control1, control2, end);
+                }
+                else
+                {
+                    _edgeRenderer.DrawTransitionEndpointHandles(start, end);
+                }
             }
         }
     }
