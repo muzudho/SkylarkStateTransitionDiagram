@@ -24,6 +24,7 @@ public sealed class MiniMapRenderer
         Viewport viewport,
         Vector2 cameraOffset,
         BoardTheme theme,
+        bool dimmed = false,
         MiniMapLayout? layout = null)
     {
         if (bounds.Width <= 0 || bounds.Height <= 0)
@@ -32,20 +33,26 @@ public sealed class MiniMapRenderer
         }
 
         layout ??= MiniMapLayout.Create(bounds, nodes, viewport, cameraOffset);
-        _spriteBatch.Draw(_pixel, bounds, WithAlpha(Blend(theme.PanelBackgroundColor, theme.BackgroundColor, 0.48f), 238));
-        DrawRectangleOutline(bounds, WithAlpha(theme.PanelTopEdgeColor, 205), 1);
+        var panelBackground = dimmed
+            ? WithAlpha(Blend(theme.PanelBackgroundColor, Color.Gray, 0.62f), 184)
+            : WithAlpha(Blend(theme.PanelBackgroundColor, theme.BackgroundColor, 0.48f), 238);
+        var edgeColor = dimmed
+            ? WithAlpha(Blend(theme.PanelTopEdgeColor, Color.Gray, 0.68f), 150)
+            : WithAlpha(theme.PanelTopEdgeColor, 205);
+        _spriteBatch.Draw(_pixel, bounds, panelBackground);
+        DrawRectangleOutline(bounds, edgeColor, 1);
 
         foreach (var node in nodes)
         {
-            DrawNode(layout, node, theme);
+            DrawNode(layout, node, theme, dimmed);
         }
 
         var view = layout.GetViewportRectangle(viewport, cameraOffset);
-        FillClamped(bounds, view, WithAlpha(theme.SelectedTransitionLineColor, 34));
-        DrawClampedOutline(bounds, view, WithAlpha(theme.SelectedTransitionLineColor, 232), 2);
+        FillClamped(bounds, view, dimmed ? new Color(120, 120, 120, 22) : WithAlpha(theme.SelectedTransitionLineColor, 34));
+        DrawClampedOutline(bounds, view, dimmed ? new Color(150, 150, 150, 135) : WithAlpha(theme.SelectedTransitionLineColor, 232), 2);
     }
 
-    private void DrawNode(MiniMapLayout layout, DiagramNode node, BoardTheme theme)
+    private void DrawNode(MiniMapLayout layout, DiagramNode node, BoardTheme theme, bool dimmed)
     {
         var position = layout.WorldToMap(node.Position);
         var radius = Math.Clamp(node.Radius / Math.Max(1f, layout.WorldBounds.Width) * layout.MapBounds.Width, 3.5f, 8f);
@@ -55,8 +62,13 @@ public sealed class MiniMapRenderer
             NodeKind.EndMarker => theme.SelectedTransitionLineColor,
             _ => theme.TransitionHandleColor
         };
-        _primitiveRenderer.DrawCircle(position, radius, WithAlpha(fill, 225));
-        _primitiveRenderer.DrawCircleOutline(position, radius + 1f, WithAlpha(theme.PanelBottomEdgeColor, 205), 1f);
+        if (dimmed)
+        {
+            fill = Blend(fill, Color.Gray, 0.68f);
+        }
+
+        _primitiveRenderer.DrawCircle(position, radius, WithAlpha(fill, dimmed ? (byte)150 : (byte)225));
+        _primitiveRenderer.DrawCircleOutline(position, radius + 1f, dimmed ? new Color(112, 112, 112, 128) : WithAlpha(theme.PanelBottomEdgeColor, 205), 1f);
     }
 
     private void FillClamped(Rectangle clipBounds, Rectangle rectangle, Color color)

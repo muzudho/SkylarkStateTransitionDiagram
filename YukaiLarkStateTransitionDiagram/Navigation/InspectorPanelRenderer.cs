@@ -4,7 +4,6 @@ using System;
 using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
-using YukaiLarkStateTransitionDiagram.MiniMap;
 
 /// <summary>
 /// 画面右上のインスペクターパネルの描画
@@ -13,17 +12,13 @@ public sealed class InspectorPanelRenderer : IDisposable
 {
     private const int MinimumVisibleWidth = 560;
     private const int PanelWidth = 290;
-    private const int PanelHeight = 218;
+    private const int PanelHeight = 70;
     private const int PanelRightMargin = 12;
     private const int PanelMinimumTop = 70;
-    private const int MiniMapLeftPadding = 12;
-    private const int MiniMapTop = 86;
-    private const int MiniMapHeight = 118;
 
     private readonly GraphicsDevice _graphicsDevice;
     private readonly SpriteBatch _spriteBatch;
     private readonly Texture2D _pixel;
-    private readonly MiniMapRenderer _miniMapRenderer;
     private readonly Dictionary<string, Texture2D> _uiTextTextureCache = new();
 
     public InspectorPanelRenderer(GraphicsDevice graphicsDevice, SpriteBatch spriteBatch, Texture2D pixel, PrimitiveRenderer primitiveRenderer)
@@ -31,7 +26,6 @@ public sealed class InspectorPanelRenderer : IDisposable
         _graphicsDevice = graphicsDevice;
         _spriteBatch = spriteBatch;
         _pixel = pixel;
-        _miniMapRenderer = new MiniMapRenderer(spriteBatch, pixel, primitiveRenderer);
     }
 
     public void Dispose()
@@ -66,8 +60,6 @@ public sealed class InspectorPanelRenderer : IDisposable
 
         DrawUiText($"状態: {nodeCount}    遷移: {transitionCount}", new Vector2(x + 12, bounds.Y + 10), theme.PanelPrimaryTextColor, 16, true);
         DrawUiText(selectionSummary, new Vector2(x + 12, bounds.Y + 36), theme.PanelSecondaryTextColor, 15, false);
-        DrawUiText("全体図", new Vector2(x + 12, bounds.Y + 64), theme.PanelMutedTextColor, 13, true);
-        _miniMapRenderer.Draw(GetMiniMapBounds(viewport), nodes, viewport, cameraOffset, theme);
     }
 
     public static bool TryGetPanelBounds(Viewport viewport, out Rectangle bounds)
@@ -82,29 +74,11 @@ public sealed class InspectorPanelRenderer : IDisposable
         return true;
     }
 
-    public static bool TryGetMiniMapBounds(Viewport viewport, out Rectangle bounds)
-    {
-        if (viewport.Width < MinimumVisibleWidth)
-        {
-            bounds = Rectangle.Empty;
-            return false;
-        }
-
-        bounds = GetMiniMapBounds(viewport);
-        return true;
-    }
-
     private static Rectangle GetPanelBounds(Viewport viewport)
     {
         var x = viewport.Width - PanelWidth - PanelRightMargin;
         var y = Math.Max(PanelMinimumTop, (viewport.Height - PanelHeight) / 2);
         return new Rectangle(x, y, PanelWidth, PanelHeight);
-    }
-
-    private static Rectangle GetMiniMapBounds(Viewport viewport)
-    {
-        var panel = GetPanelBounds(viewport);
-        return new Rectangle(panel.X + MiniMapLeftPadding, panel.Y + MiniMapTop, PanelWidth - MiniMapLeftPadding * 2, MiniMapHeight);
     }
 
     private float DrawUiText(string text, Vector2 position, Color color, float size, bool bold)

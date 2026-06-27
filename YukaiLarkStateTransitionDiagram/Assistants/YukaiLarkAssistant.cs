@@ -21,6 +21,7 @@ internal sealed class YukaiLarkAssistant
     private bool _skipSecondStateNode;
 
     public Rectangle MascotBounds { get; private set; }
+    public Rectangle CutInBandBounds { get; private set; }
 
     private bool IsAssistReady => _assistSeconds >= AssistWakeSeconds;
     private bool IsAssistGhostReady => _assistSeconds >= AssistWakeSeconds + AssistGhostDelaySeconds;
@@ -151,6 +152,7 @@ internal sealed class YukaiLarkAssistant
         DrawUiText drawUiText)
     {
         MascotBounds = Rectangle.Empty;
+        CutInBandBounds = Rectangle.Empty;
         if (viewport.Width < 640 || viewport.Height < 420)
         {
             return;
@@ -302,7 +304,7 @@ internal sealed class YukaiLarkAssistant
         return "ユカイラーク: 開始から一番遠い状態から終了マークへ遷移をつなげます。Enterか鳥をクリック。";
     }
 
-    private static void DrawAssistBubble(
+    private void DrawAssistBubble(
         SpriteBatch spriteBatch,
         Texture2D pixel,
         Viewport viewport,
@@ -352,7 +354,7 @@ internal sealed class YukaiLarkAssistant
         return ("終了マークへつなぐ？", "Enter または鳥をクリック");
     }
 
-    private static void DrawCompletedAssistBubble(
+    private void DrawCompletedAssistBubble(
         SpriteBatch spriteBatch,
         Texture2D pixel,
         Viewport viewport,
@@ -372,7 +374,7 @@ internal sealed class YukaiLarkAssistant
         DrawAssistantCutIn(spriteBatch, pixel, viewport, mascotBounds, action, hint, theme, drawRectangleOutline, drawUiText);
     }
 
-    private static void DrawAssistantCutIn(
+    private void DrawAssistantCutIn(
         SpriteBatch spriteBatch,
         Texture2D pixel,
         Viewport viewport,
@@ -393,6 +395,7 @@ internal sealed class YukaiLarkAssistant
         var preferredY = Math.Max(mascotBounds.Bottom + 16, (int)(viewport.Height * 0.72f));
         var y = Math.Clamp(preferredY, 86, viewport.Height - bandHeight - 72);
         var band = new Rectangle(0, y, viewport.Width, bandHeight);
+        CutInBandBounds = band;
         var frameWidth = Math.Min(760, Math.Max(420, viewport.Width - 112));
         var frame = new Rectangle((viewport.Width - frameWidth) / 2, y + 7, frameWidth, bandHeight - 14);
         var accent = hasSecondaryText

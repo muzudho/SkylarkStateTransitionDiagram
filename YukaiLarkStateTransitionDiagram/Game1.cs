@@ -32,6 +32,10 @@ public class Game1 : Game
     private const float ExportPhotoPreviewDurationSeconds = 1.35f;
     private const int RecentFileMenuMaxItems = AppConfig.MaxRecentFiles;
     private const int ThemeMenuPageSize = 5;
+    private const int MiniMapWidth = 266;
+    private const int MiniMapHeight = 118;
+    private const int MiniMapRightMargin = 12;
+    private const int MiniMapBottomMargin = 64;
     private const int MaxFileNameLength = 255;
     private const string YukaiLarkMascotTexturePath = "Assets/BrandLogo/yukai-lark-logo.png";
     private static readonly Keys[] ThemeDigitKeys =
@@ -73,6 +77,7 @@ public class Game1 : Game
     private NodeRenderer _nodeRenderer = null!;
     private HeaderRenderer _headerRenderer = null!;
     private InspectorPanelRenderer _inspectorPanelRenderer = null!;
+    private MiniMapRenderer _miniMapRenderer = null!;
     private ShortcutKeyRenderer _shortcutKeyRenderer = null!;
     private IKeyCapTheme _keyCapTheme = KeyCapThemes.Current;
     private BoardTheme _boardTheme = BoardThemes.ForKeyCapTheme(KeyCapThemes.Current);
@@ -159,6 +164,7 @@ public class Game1 : Game
         _edgeRenderer = new EdgeRenderer(_primitiveRenderer, _spriteBatch, GetLabelTexture, _boardTheme);
         _headerRenderer = new HeaderRenderer(GraphicsDevice, _spriteBatch, _pixel);
         _inspectorPanelRenderer = new InspectorPanelRenderer(GraphicsDevice, _spriteBatch, _pixel, _primitiveRenderer);
+        _miniMapRenderer = new MiniMapRenderer(_spriteBatch, _pixel, _primitiveRenderer);
         _shortcutKeyRenderer = new ShortcutKeyRenderer(GraphicsDevice, _spriteBatch, _pixel, _keyCapTheme, _boardTheme);
         _nodeRenderer = new NodeRenderer(_primitiveRenderer, _spriteBatch, Palette, GetLabelTexture, _boardTheme);
         _yukaiLarkMascotTexture = LoadTextureWithTransparentWhite(YukaiLarkMascotTexturePath);
@@ -249,6 +255,7 @@ public class Game1 : Game
         DrawYukaiLarkMascot(GraphicsDevice.Viewport, gameTime.TotalGameTime);
 
         DrawInspectorPanel();
+        DrawMiniMapOverlay();
         if (!_isThemeMenuOpen)
         {
             DrawBottomShortcutHelp(gameTime);
@@ -2197,7 +2204,7 @@ public class Game1 : Game
     }
     private bool TryBeginMiniMapDrag(Vector2 screenMousePosition)
     {
-        if (!InspectorPanelRenderer.TryGetMiniMapBounds(GraphicsDevice.Viewport, out var bounds)
+        if (!TryGetMiniMapBounds(GraphicsDevice.Viewport, out var bounds)
             || !bounds.Contains(screenMousePosition))
         {
             return false;
@@ -2211,7 +2218,7 @@ public class Game1 : Game
 
     private void CenterViewFromMiniMap(Vector2 screenMousePosition)
     {
-        if (!InspectorPanelRenderer.TryGetMiniMapBounds(GraphicsDevice.Viewport, out var bounds))
+        if (!TryGetMiniMapBounds(GraphicsDevice.Viewport, out var bounds))
         {
             return;
         }
@@ -2324,7 +2331,7 @@ public class Game1 : Game
     }
 
     private bool IsMouseOverMiniMap(MouseState mouse)
-        => InspectorPanelRenderer.TryGetMiniMapBounds(GraphicsDevice.Viewport, out var bounds)
+        => TryGetMiniMapBounds(GraphicsDevice.Viewport, out var bounds)
             && bounds.Contains(mouse.Position);
 
     private bool CanPanFromMousePosition(KeyboardState keyboard, MouseState mouse)
@@ -3587,6 +3594,32 @@ public class Game1 : Game
             _nodes,
             _cameraOffset,
             _boardTheme);
+    }
+
+    private void DrawMiniMapOverlay()
+    {
+        if (!TryGetMiniMapBounds(GraphicsDevice.Viewport, out var bounds))
+        {
+            return;
+        }
+
+        var dimmed = _yukaiLarkAssistant.CutInBandBounds != Rectangle.Empty
+            && bounds.Intersects(_yukaiLarkAssistant.CutInBandBounds);
+        _miniMapRenderer.Draw(bounds, _nodes, GraphicsDevice.Viewport, _cameraOffset, _boardTheme, dimmed);
+    }
+
+    private static bool TryGetMiniMapBounds(Viewport viewport, out Rectangle bounds)
+    {
+        if (viewport.Width < 560 || viewport.Height < 420)
+        {
+            bounds = Rectangle.Empty;
+            return false;
+        }
+
+        var x = viewport.Width - MiniMapWidth - MiniMapRightMargin;
+        var y = viewport.Height - MiniMapHeight - MiniMapBottomMargin;
+        bounds = new Rectangle(x, Math.Max(86, y), MiniMapWidth, MiniMapHeight);
+        return true;
     }
 
     private string GetSelectionSummary()
