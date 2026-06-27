@@ -48,8 +48,8 @@ public sealed class MiniMapRenderer
         }
 
         var view = layout.GetViewportRectangle(viewport, cameraOffset);
-        FillClamped(bounds, view, dimmed ? new Color(120, 120, 120, 22) : WithAlpha(theme.SelectedTransitionLineColor, 34));
-        DrawClampedOutline(bounds, view, dimmed ? new Color(150, 150, 150, 135) : WithAlpha(theme.SelectedTransitionLineColor, 232), 2);
+        DrawClampedOutline(bounds, view, dimmed ? new Color(74, 74, 74, 170) : new Color(24, 28, 32, 190), 3);
+        DrawClampedOutline(bounds, view, dimmed ? new Color(172, 172, 172, 150) : WithAlpha(theme.SelectedTransitionLineColor, 232), 1);
     }
 
     private void DrawNode(MiniMapLayout layout, DiagramNode node, BoardTheme theme, bool dimmed)
@@ -69,15 +69,6 @@ public sealed class MiniMapRenderer
 
         _primitiveRenderer.DrawCircle(position, radius, WithAlpha(fill, dimmed ? (byte)150 : (byte)225));
         _primitiveRenderer.DrawCircleOutline(position, radius + 1f, dimmed ? new Color(112, 112, 112, 128) : WithAlpha(theme.PanelBottomEdgeColor, 205), 1f);
-    }
-
-    private void FillClamped(Rectangle clipBounds, Rectangle rectangle, Color color)
-    {
-        var clipped = Rectangle.Intersect(clipBounds, rectangle);
-        if (clipped.Width > 0 && clipped.Height > 0)
-        {
-            _spriteBatch.Draw(_pixel, clipped, color);
-        }
     }
 
     private void DrawClampedOutline(Rectangle clipBounds, Rectangle rectangle, Color color, int thickness)

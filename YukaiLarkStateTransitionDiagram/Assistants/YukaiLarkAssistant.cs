@@ -181,7 +181,7 @@ internal sealed class YukaiLarkAssistant
     private static Rectangle GetMascotTarget(Viewport viewport, int targetHeight, float bob, Rectangle avoidBounds)
     {
         const int margin = 22;
-        const int panelGap = 14;
+        const int panelGap = 56;
         var bobOffset = (int)MathF.Round(bob);
         var target = new Rectangle(viewport.Width - MascotTargetWidth - margin, 178 + bobOffset, MascotTargetWidth, targetHeight);
         if (avoidBounds == Rectangle.Empty)
