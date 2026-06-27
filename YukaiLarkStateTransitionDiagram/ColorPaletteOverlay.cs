@@ -10,6 +10,7 @@ public partial class Game1
 {
     private const int ColorPaletteSwatchSize = 42;
     private const int ColorPaletteSwatchGap = 10;
+    private const int ColorPaletteSwapButtonHeight = 24;
     private static readonly Keys[] ColorPaletteDigitKeys =
     [
         Keys.D1,
@@ -44,7 +45,7 @@ public partial class Game1
 
         _isColorPaletteOpen = true;
         _colorPaletteSwapSourceIndex = -1;
-        _status = "状態色パレット: 1-6またはクリックで色を選択。C/Esc/右クリックで閉じます。";
+        _status = "状態色パレット: 1-6またはクリックで色を選択。下の > で隣の色と入れ替えます。";
     }
 
     private void CloseColorPalette(string status)
@@ -84,6 +85,15 @@ public partial class Game1
         }
 
         var point = mouse.Position;
+        for (var i = 0; i < _boardTheme.NormalNodePalette.Length - 1; i++)
+        {
+            if (GetColorPaletteSwapButtonRectangle(i).Contains(point))
+            {
+                SwapColorPaletteEntries(i, i + 1);
+                return true;
+            }
+        }
+
         for (var i = 0; i < _boardTheme.NormalNodePalette.Length; i++)
         {
             if (!GetColorPaletteSwatchRectangle(i).Contains(point))
@@ -118,11 +128,16 @@ public partial class Game1
         DrawScreenRectangleOutline(panel, WithAlpha(_boardTheme.PanelTopEdgeColor, 230), 2);
 
         DrawUiText("状態色パレット", new Vector2(panel.X + 16, panel.Y + 12), _boardTheme.PanelPrimaryTextColor, 16, true);
-        DrawUiText("1-6/クリックで選択  C/Escで閉じる", new Vector2(panel.X + 16, panel.Y + 38), _boardTheme.PanelSecondaryTextColor, 13, false);
+        DrawUiText("1-6/クリックで選択  下の > で隣と入替", new Vector2(panel.X + 16, panel.Y + 38), _boardTheme.PanelSecondaryTextColor, 13, false);
 
         for (var i = 0; i < _boardTheme.NormalNodePalette.Length; i++)
         {
             DrawColorPaletteSwatch(i);
+        }
+
+        for (var i = 0; i < _boardTheme.NormalNodePalette.Length - 1; i++)
+        {
+            DrawColorPaletteSwapButton(i);
         }
     }
 
@@ -146,11 +161,27 @@ public partial class Game1
         DrawUiText(keyText, new Vector2(keyBounds.X + (keyBounds.Width - keyTexture.Width) / 2f, keyBounds.Y + 1), _boardTheme.PanelPrimaryTextColor, 13, true);
     }
 
+    private void DrawColorPaletteSwapButton(int index)
+    {
+        var bounds = GetColorPaletteSwapButtonRectangle(index);
+        var fill = WithAlpha(Blend(_boardTheme.PanelBackgroundColor, _keyCapTheme.FaceColor, 0.18f), 232);
+        var edge = WithAlpha(_keyCapTheme.BottomEdgeColor, 220);
+        _spriteBatch.Draw(_pixel, bounds, fill);
+        DrawScreenRectangleOutline(bounds, edge, 1);
+
+        var label = ">";
+        var texture = GetUiTextTexture(label, 16, true);
+        var position = new Vector2(
+            bounds.X + (bounds.Width - texture.Width) / 2f,
+            bounds.Y + (bounds.Height - texture.Height) / 2f - 1f);
+        DrawUiText(label, position, _keyCapTheme.LabelTextColor, 16, true);
+    }
+
     private Rectangle GetColorPalettePanelRectangle()
     {
         var viewport = GraphicsDevice.Viewport;
         const int panelWidth = 382;
-        const int panelHeight = 118;
+        const int panelHeight = 150;
         var x = Math.Clamp(viewport.Width - panelWidth - 16, 12, Math.Max(12, viewport.Width - panelWidth - 12));
         var y = Math.Clamp(54, 48, Math.Max(48, viewport.Height - panelHeight - 44));
 
@@ -168,7 +199,13 @@ public partial class Game1
     {
         var panel = GetColorPalettePanelRectangle();
         var x = panel.X + 16 + index * (ColorPaletteSwatchSize + ColorPaletteSwatchGap);
-        return new Rectangle(x, panel.Y + 64, ColorPaletteSwatchSize, ColorPaletteSwatchSize);
+        return new Rectangle(x, panel.Y + 62, ColorPaletteSwatchSize, ColorPaletteSwatchSize);
+    }
+
+    private Rectangle GetColorPaletteSwapButtonRectangle(int index)
+    {
+        var swatch = GetColorPaletteSwatchRectangle(index);
+        return new Rectangle(swatch.X, swatch.Bottom + 8, swatch.Width, ColorPaletteSwapButtonHeight);
     }
 
     private bool TryGetColorPaletteShortcutIndex(KeyboardState keyboard, out int paletteIndex)
@@ -185,7 +222,6 @@ public partial class Game1
         paletteIndex = -1;
         return false;
     }
-
 
     private void AssignSelectedNodeColorIndex(int paletteIndex)
     {
@@ -217,12 +253,26 @@ public partial class Game1
             return;
         }
 
+        SwapColorPaletteEntries(_colorPaletteSwapSourceIndex, paletteIndex);
+        _colorPaletteSwapSourceIndex = -1;
+    }
+
+    private void SwapColorPaletteEntries(int sourceIndex, int targetIndex)
+    {
+        if (sourceIndex < 0
+            || targetIndex < 0
+            || sourceIndex >= _boardTheme.NormalNodePalette.Length
+            || targetIndex >= _boardTheme.NormalNodePalette.Length
+            || sourceIndex == targetIndex)
+        {
+            return;
+        }
+
         var colors = _boardTheme.NormalNodePalette.ToArray();
-        (colors[_colorPaletteSwapSourceIndex], colors[paletteIndex]) = (colors[paletteIndex], colors[_colorPaletteSwapSourceIndex]);
+        (colors[sourceIndex], colors[targetIndex]) = (colors[targetIndex], colors[sourceIndex]);
         _appConfig.SetNormalNodePaletteOverride(_keyCapTheme.Name, colors);
         AppConfigStore.Save(_appConfig);
         ApplyCurrentBoardTheme();
-        _status = $"状態色パレットの {_colorPaletteSwapSourceIndex + 1} 番と {paletteIndex + 1} 番を入れ替えました。";
-        _colorPaletteSwapSourceIndex = -1;
+        _status = $"状態色パレットの {sourceIndex + 1} 番と {targetIndex + 1} 番を入れ替えました。";
     }
 }
