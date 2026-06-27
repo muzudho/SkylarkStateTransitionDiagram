@@ -245,7 +245,8 @@ public sealed class ShortcutKeyRenderer : IDisposable
                         new HelpHint("Ctrl+O", "読込"),
                         new HelpHint("Ctrl+P", "PNG出力"),
                         new HelpHint("T", "テーマ選択"),
-                        new HelpHint("0-9", "テーマ")
+                        new HelpHint("0-9", "テーマ"),
+                        new HelpHint("ホイール", "拡大縮小")
                     ]
                 )
             ];
@@ -287,7 +288,8 @@ public sealed class ShortcutKeyRenderer : IDisposable
                         new HelpHint("Ctrl+O", "読込"),
                         new HelpHint("Ctrl+P", "PNG出力"),
                         new HelpHint("T", "テーマ選択"),
-                        new HelpHint("0-9", "テーマ")
+                        new HelpHint("0-9", "テーマ"),
+                        new HelpHint("ホイール", "拡大縮小")
                     ]
                 )
             ];
@@ -319,7 +321,8 @@ public sealed class ShortcutKeyRenderer : IDisposable
                 [
                     new HelpHint("Shift+ドラッグ", "遷移作成"),
                     new HelpHint("Shift+同一状態", "自己ループ"),
-                    new HelpHint("空白ドラッグ", "表示移動")
+                    new HelpHint("空白ドラッグ", "表示移動"),
+                    new HelpHint("ホイール", "拡大縮小")
                 ]
             ),
             new HelpPage
@@ -328,12 +331,12 @@ public sealed class ShortcutKeyRenderer : IDisposable
                     new HelpHint("Ctrl+P", "PNG出力"),
                     new HelpHint("T", "テーマ選択"),
                     new HelpHint("0-9", "テーマ"),
-                    new HelpHint("空白ドラッグ", "表示移動")
+                    new HelpHint("空白ドラッグ", "表示移動"),
+                    new HelpHint("ホイール", "拡大縮小")
                 ]
             )
         ];
     }
-
     /// <summary>
     /// ショートカットキーのヒントを描画する
     /// </summary>
