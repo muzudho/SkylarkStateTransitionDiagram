@@ -143,6 +143,27 @@ public partial class Game1
             return;
         }
 
+        if (GetThemeMenuPreviousPageButtonRectangle().Contains(point))
+        {
+            MoveThemeMenuPage(-1);
+            return;
+        }
+
+        if (GetThemeMenuNextPageButtonRectangle().Contains(point))
+        {
+            MoveThemeMenuPage(1);
+            return;
+        }
+
+        for (var pageIndex = 0; pageIndex < GetThemeMenuPageCount(); pageIndex++)
+        {
+            if (GetThemeMenuPageIndicatorRectangle(pageIndex).Contains(point))
+            {
+                SelectThemeMenuPage(pageIndex);
+                return;
+            }
+        }
+
         var startIndex = GetThemeMenuVisibleStartIndex();
         var visibleCount = GetThemeMenuVisibleItemCount();
         for (var visibleIndex = 0; visibleIndex < visibleCount; visibleIndex++)
@@ -154,26 +175,6 @@ public partial class Game1
                 return;
             }
         }
-    }
-
-    private void DrawThemeButton(Viewport viewport)
-    {
-        var bounds = GetThemeButtonRectangle(viewport);
-        if (bounds.Width <= 0)
-        {
-            return;
-        }
-
-        var label = $"テーマ: {_keyCapTheme.Name}";
-        _spriteBatch.Draw(_pixel, bounds, WithAlpha(_keyCapTheme.FaceColor, 236));
-        _spriteBatch.Draw(_pixel, new Rectangle(bounds.X, bounds.Y, bounds.Width, 1), WithAlpha(_keyCapTheme.TopEdgeColor, 245));
-        _spriteBatch.Draw(_pixel, new Rectangle(bounds.X, bounds.Y, 1, bounds.Height), WithAlpha(_keyCapTheme.TopEdgeColor, 245));
-        _spriteBatch.Draw(_pixel, new Rectangle(bounds.X, bounds.Bottom - 2, bounds.Width, 2), WithAlpha(_keyCapTheme.BottomEdgeColor, 245));
-        _spriteBatch.Draw(_pixel, new Rectangle(bounds.Right - 1, bounds.Y, 1, bounds.Height), WithAlpha(_keyCapTheme.BottomEdgeColor, 245));
-        _spriteBatch.Draw(_pixel, new Rectangle(bounds.X + 2, bounds.Y + 2, bounds.Width - 4, 1), WithAlpha(_keyCapTheme.InnerHighlightColor, 210));
-        DrawScreenRectangleOutline(bounds, WithAlpha(_boardTheme.HeaderBorderColor, 210), 1);
-        DrawUiText("T", new Vector2(bounds.X + 8, bounds.Y + 6), _keyCapTheme.LabelTextColor, 13, true);
-        DrawUiText(label, new Vector2(bounds.X + 32, bounds.Y + 5), _keyCapTheme.LabelTextColor, 14, true);
     }
 
     private Rectangle GetThemeButtonRectangle(Viewport viewport)
@@ -188,84 +189,11 @@ public partial class Game1
         return new Rectangle(viewport.Width - width - 12, 8, width, 28);
     }
 
-    private void DrawThemeMenuOverlay()
-    {
-        if (!_isThemeMenuOpen)
-        {
-            return;
-        }
-
-        var viewport = GraphicsDevice.Viewport;
-        _spriteBatch.Draw(_pixel, new Rectangle(0, 0, viewport.Width, viewport.Height), WithAlpha(Blend(_boardTheme.BackgroundColor, Color.Black, 0.42f), 150));
-
-        var panel = GetThemeMenuPanelRectangle();
-        _spriteBatch.Draw(_pixel, new Rectangle(panel.X + 6, panel.Y + 8, panel.Width, panel.Height), WithAlpha(Blend(_boardTheme.BackgroundColor, Color.Black, 0.42f), 115));
-        _spriteBatch.Draw(_pixel, panel, WithAlpha(_boardTheme.PanelBackgroundColor, 246));
-        DrawScreenRectangleOutline(panel, WithAlpha(_boardTheme.PanelTopEdgeColor, 235), 2);
-
-        DrawUiText("テーマ選択", new Vector2(panel.X + 24, panel.Y + 20), _boardTheme.PanelPrimaryTextColor, 24, true);
-        DrawUiText("クリックや0-9キーで切り替えます。後ろの画面で見た目を確認できます。", new Vector2(panel.X + 24, panel.Y + 56), _boardTheme.PanelSecondaryTextColor, 15, false);
-        DrawThemeMenuActionButtons();
-
-        var pageCount = GetThemeMenuPageCount();
-        var pageText = $"({_themeMenuPage + 1}/{pageCount})";
-        var pageTexture = GetUiTextTexture(pageText, 15, true);
-        DrawUiText(pageText, new Vector2(panel.Right - pageTexture.Width - 24, panel.Y + 62), _boardTheme.PanelMutedTextColor, 15, true);
-
-        var startIndex = GetThemeMenuVisibleStartIndex();
-        var visibleCount = GetThemeMenuVisibleItemCount();
-        for (var visibleIndex = 0; visibleIndex < visibleCount; visibleIndex++)
-        {
-            DrawThemeMenuItem(startIndex + visibleIndex, visibleIndex);
-        }
-    }
-
-    private void DrawThemeMenuActionButtons()
-    {
-        DrawThemeMenuActionButton(GetThemeMenuConfirmButtonRectangle(), "このテーマにする");
-        DrawThemeMenuActionButton(GetThemeMenuCancelButtonRectangle(), "キャンセル");
-    }
-
-    private void DrawThemeMenuActionButton(Rectangle bounds, string label)
-    {
-        _spriteBatch.Draw(_pixel, bounds, WithAlpha(_keyCapTheme.FaceColor, 228));
-        DrawScreenRectangleOutline(bounds, WithAlpha(_keyCapTheme.BottomEdgeColor, 232), 1);
-        var labelTexture = GetUiTextTexture(label, 14, true);
-        var labelX = bounds.X + Math.Max(8, (bounds.Width - labelTexture.Width) / 2);
-        DrawUiText(label, new Vector2(labelX, bounds.Y + 8), _keyCapTheme.LabelTextColor, 14, true);
-    }
-
-    private void DrawThemeMenuItem(int themeIndex, int visibleIndex)
-    {
-        var theme = KeyCapThemes.AllThemes[themeIndex];
-        var bounds = GetThemeMenuItemRectangle(visibleIndex);
-        var themeField = new Rectangle(bounds.X, bounds.Y, bounds.Width - 92, bounds.Height);
-        var selected = ReferenceEquals(theme, _keyCapTheme);
-        var themeBoard = BoardThemes.ForKeyCapTheme(theme);
-        var fill = WithAlpha(Blend(themeBoard.PanelBackgroundColor, theme.FaceColor, 0.18f), 232);
-        var edge = WithAlpha(theme.BottomEdgeColor, 190);
-
-        _spriteBatch.Draw(_pixel, themeField, fill);
-        DrawScreenRectangleOutline(themeField, edge, 1);
-        _spriteBatch.Draw(_pixel, new Rectangle(themeField.X + 12, themeField.Y + 10, 34, 24), theme.FaceColor);
-        DrawScreenRectangleOutline(new Rectangle(themeField.X + 12, themeField.Y + 10, 34, 24), theme.BottomEdgeColor, 1);
-
-        var shortcut = GetShortcutIndexForTheme(theme);
-        var shortcutText = shortcut is null ? "-" : shortcut.Value.ToString();
-        DrawUiText(shortcutText, new Vector2(themeField.X + 58, themeField.Y + 12), theme.LabelTextColor, 16, true);
-        DrawUiText(theme.Name, new Vector2(themeField.X + 92, themeField.Y + 11), themeBoard.PanelPrimaryTextColor, 17, true);
-        if (selected)
-        {
-            DrawUiText("選択中", new Vector2(themeField.Right + 18, bounds.Y + 13), _boardTheme.PanelPrimaryTextColor, 14, true);
-        }
-    }
-
     private Rectangle GetThemeMenuPanelRectangle()
     {
         var viewport = GraphicsDevice.Viewport;
         var width = Math.Clamp(viewport.Width - 64, 520, 680);
-        var visibleCount = GetThemeMenuVisibleItemCount();
-        var height = Math.Min(viewport.Height - 64, 148 + visibleCount * 48);
+        var height = Math.Min(viewport.Height - 64, 148 + ThemeMenuPageSize * 48);
         var x = (viewport.Width - width) / 2;
         var y = Math.Max(24, (viewport.Height - height) / 2);
         return new Rectangle(x, y, width, height);
@@ -289,6 +217,36 @@ public partial class Game1
     {
         var panel = GetThemeMenuPanelRectangle();
         return new Rectangle(panel.Right - 288, panel.Bottom - 44, 102, 32);
+    }
+
+    private Rectangle GetThemeMenuPagerRailRectangle()
+    {
+        var panel = GetThemeMenuPanelRectangle();
+        var cancelButton = GetThemeMenuCancelButtonRectangle();
+        return new Rectangle(panel.X + 24, panel.Bottom - 44, Math.Max(126, cancelButton.X - panel.X - 36), 32);
+    }
+
+    private Rectangle GetThemeMenuPreviousPageButtonRectangle()
+    {
+        var rail = GetThemeMenuPagerRailRectangle();
+        return new Rectangle(rail.X + 4, rail.Y + 4, 34, 24);
+    }
+
+    private Rectangle GetThemeMenuNextPageButtonRectangle()
+    {
+        var rail = GetThemeMenuPagerRailRectangle();
+        return new Rectangle(rail.Right - 38, rail.Y + 4, 34, 24);
+    }
+
+    private Rectangle GetThemeMenuPageIndicatorRectangle(int pageIndex)
+    {
+        const int width = 14;
+        const int gap = 7;
+        var pageCount = GetThemeMenuPageCount();
+        var rail = GetThemeMenuPagerRailRectangle();
+        var totalWidth = pageCount * width + Math.Max(0, pageCount - 1) * gap;
+        var x = rail.X + (rail.Width - totalWidth) / 2 + pageIndex * (width + gap);
+        return new Rectangle(x, rail.Y + 9, width, 14);
     }
 
     private int GetThemeMenuVisibleStartIndex()
@@ -339,6 +297,13 @@ public partial class Game1
     {
         var pageCount = GetThemeMenuPageCount();
         _themeMenuPage = (_themeMenuPage + delta + pageCount) % pageCount;
+        _status = $"テーマ表ページ {_themeMenuPage + 1}/{pageCount} を表示しています。";
+    }
+
+    private void SelectThemeMenuPage(int pageIndex)
+    {
+        var pageCount = GetThemeMenuPageCount();
+        _themeMenuPage = Math.Clamp(pageIndex, 0, pageCount - 1);
         _status = $"テーマ表ページ {_themeMenuPage + 1}/{pageCount} を表示しています。";
     }
 
