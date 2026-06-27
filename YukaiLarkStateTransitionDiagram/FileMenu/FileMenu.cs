@@ -152,12 +152,12 @@ public partial class Game1
         }
 
         var viewport = GraphicsDevice.Viewport;
-        _spriteBatch.Draw(_pixel, new Rectangle(0, 0, viewport.Width, viewport.Height), new Color(18, 26, 28, 150));
+        _spriteBatch.Draw(_pixel, new Rectangle(0, 0, viewport.Width, viewport.Height), WithAlpha(Blend(_boardTheme.BackgroundColor, Color.Black, 0.42f), 150));
 
         var panel = GetFileMenuPanelRectangle();
-        _spriteBatch.Draw(_pixel, new Rectangle(panel.X + 6, panel.Y + 8, panel.Width, panel.Height), new Color(16, 22, 24, 105));
-        _spriteBatch.Draw(_pixel, panel, new Color(255, 253, 239, 245));
-        DrawScreenRectangleOutline(panel, new Color(83, 178, 176), 2);
+        _spriteBatch.Draw(_pixel, new Rectangle(panel.X + 6, panel.Y + 8, panel.Width, panel.Height), WithAlpha(Blend(_boardTheme.BackgroundColor, Color.Black, 0.42f), 115));
+        _spriteBatch.Draw(_pixel, panel, WithAlpha(_boardTheme.PanelBackgroundColor, 246));
+        DrawScreenRectangleOutline(panel, WithAlpha(_boardTheme.PanelTopEdgeColor, 235), 2);
 
         if (_yukaiLarkMascotTexture is not null)
         {
@@ -169,9 +169,9 @@ public partial class Game1
         var textX = panel.X + 130;
         var textY = panel.Y + 24;
         var prompt = _isStartupFileMenu ? "最近保存したファイルを開く？" : "最近保存したファイル";
-        DrawUiText("ユカイラーク", new Vector2(textX, textY), new Color(51, 84, 102), 18, true);
-        DrawUiText(prompt, new Vector2(textX, textY + 28), new Color(38, 55, 62), 24, true);
-        DrawUiText("新しく始めるか、ファイルを読込むこともできます。", new Vector2(textX, textY + 64), new Color(88, 105, 112), 15, false);
+        DrawUiText("ユカイラーク", new Vector2(textX, textY), _boardTheme.PanelPrimaryTextColor, 18, true);
+        DrawUiText(prompt, new Vector2(textX, textY + 28), _boardTheme.PanelPrimaryTextColor, 24, true);
+        DrawUiText("新しく始めるか、ファイルを読込むこともできます。", new Vector2(textX, textY + 64), _boardTheme.PanelSecondaryTextColor, 15, false);
 
         var (newButton, openButton) = GetFileMenuActionRectangles();
         DrawFileMenuButton(newButton, "N", "新規作成", "空の状態遷移図で始める", enabled: true);
@@ -179,10 +179,10 @@ public partial class Game1
 
         var recentFiles = GetRecentFiles();
         var recentTitleY = GetRecentFileMenuItemRectangle(0).Y - 28;
-        DrawUiText("最近保存したファイル", new Vector2(panel.X + 24, recentTitleY), new Color(51, 84, 102), 16, true);
+        DrawUiText("最近保存したファイル", new Vector2(panel.X + 24, recentTitleY), _boardTheme.PanelPrimaryTextColor, 16, true);
         if (recentFiles.Count == 0)
         {
-            DrawUiText("まだ最近ファイルはありません。", new Vector2(panel.X + 24, recentTitleY + 34), new Color(110, 126, 132), 15, false);
+            DrawUiText("まだ最近ファイルはありません。", new Vector2(panel.X + 24, recentTitleY + 34), _boardTheme.PanelMutedTextColor, 15, false);
             return;
         }
 
@@ -194,25 +194,32 @@ public partial class Game1
 
     private void DrawFileMenuButton(Rectangle bounds, string key, string title, string description, bool enabled)
     {
-        var fill = enabled ? new Color(238, 250, 239) : new Color(230, 232, 232);
-        var edge = enabled ? new Color(83, 178, 176) : new Color(160, 166, 168);
+        var fill = enabled
+            ? WithAlpha(Blend(_boardTheme.PanelBackgroundColor, _keyCapTheme.FaceColor, 0.18f), 232)
+            : WithAlpha(Blend(_boardTheme.PanelBackgroundColor, Color.Gray, 0.35f), 220);
+        var edge = enabled
+            ? WithAlpha(_keyCapTheme.BottomEdgeColor, 232)
+            : WithAlpha(_boardTheme.PanelMutedTextColor, 180);
         _spriteBatch.Draw(_pixel, bounds, fill);
         DrawScreenRectangleOutline(bounds, edge, 2);
-        DrawUiText(key, new Vector2(bounds.X + 14, bounds.Y + 11), new Color(51, 84, 102), 18, true);
-        DrawUiText(title, new Vector2(bounds.X + 48, bounds.Y + 9), new Color(38, 55, 62), 17, true);
-        DrawUiText(description, new Vector2(bounds.X + 48, bounds.Y + 34), new Color(88, 105, 112), 13, false);
+        DrawUiText(key, new Vector2(bounds.X + 14, bounds.Y + 11), _keyCapTheme.LabelTextColor, 18, true);
+        DrawUiText(title, new Vector2(bounds.X + 48, bounds.Y + 9), _boardTheme.PanelPrimaryTextColor, 17, true);
+        DrawUiText(description, new Vector2(bounds.X + 48, bounds.Y + 34), _boardTheme.PanelSecondaryTextColor, 13, false);
     }
 
     private void DrawRecentFileMenuItem(int index, string path)
     {
         var bounds = GetRecentFileMenuItemRectangle(index);
-        _spriteBatch.Draw(_pixel, bounds, index % 2 == 0 ? new Color(250, 252, 246, 245) : new Color(238, 250, 239, 245));
-        DrawScreenRectangleOutline(bounds, new Color(178, 219, 203), 1);
+        var fill = index % 2 == 0
+            ? WithAlpha(Blend(_boardTheme.PanelBackgroundColor, _boardTheme.BackgroundColor, 0.12f), 245)
+            : WithAlpha(Blend(_boardTheme.PanelBackgroundColor, _keyCapTheme.FaceColor, 0.16f), 245);
+        _spriteBatch.Draw(_pixel, bounds, fill);
+        DrawScreenRectangleOutline(bounds, WithAlpha(_boardTheme.PanelTopEdgeColor, 190), 1);
 
         var shortcut = index == 9 ? "0" : (index + 1).ToString();
-        DrawUiText(shortcut, new Vector2(bounds.X + 12, bounds.Y + 11), new Color(51, 84, 102), 16, true);
-        DrawUiText(GetRecentFileDisplayText(path), new Vector2(bounds.X + 44, bounds.Y + 3), new Color(38, 55, 62), 15, true);
-        DrawUiText(Path.GetDirectoryName(path) ?? string.Empty, new Vector2(bounds.X + 44, bounds.Y + 24), new Color(98, 116, 122), 12, false);
+        DrawUiText(shortcut, new Vector2(bounds.X + 12, bounds.Y + 11), _keyCapTheme.LabelTextColor, 16, true);
+        DrawUiText(GetRecentFileDisplayText(path), new Vector2(bounds.X + 44, bounds.Y + 3), _boardTheme.PanelPrimaryTextColor, 15, true);
+        DrawUiText(Path.GetDirectoryName(path) ?? string.Empty, new Vector2(bounds.X + 44, bounds.Y + 24), _boardTheme.PanelMutedTextColor, 12, false);
     }
 
     private (Rectangle NewButton, Rectangle OpenButton) GetFileMenuActionRectangles()
