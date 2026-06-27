@@ -66,17 +66,7 @@ public static class KeyCapThemes
         Hokusai,
         Monochrome,
         Mint,
-        Amber,
-        Midnight,
-        PastelColors,
-        Beach,
-        Roma,
-        Tropical,
-        Forest,
-        Desert,
-        Snow,
-        Rainy,
-        NightSky
+        Amber
     ];
 }
 
