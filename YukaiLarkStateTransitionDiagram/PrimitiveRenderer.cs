@@ -49,6 +49,9 @@ public sealed class PrimitiveRenderer
         _spriteBatch.Draw(_pixel, start, null, color, (float)Math.Atan2(delta.Y, delta.X), new Vector2(0f, 0.5f), new Vector2(length, thickness), SpriteEffects.None, 0f);
     }
 
+    public void DrawPixelRectangle(Rectangle rectangle, Color color)
+        => _spriteBatch.Draw(_pixel, rectangle, color);
+
     /// <summary>
     /// 円を描く。
     /// </summary>

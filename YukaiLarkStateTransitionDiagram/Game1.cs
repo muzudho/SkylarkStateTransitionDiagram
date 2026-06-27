@@ -2658,7 +2658,7 @@ public class Game1 : Game
         foreach (var node in _nodes)
         {
             var inactive = includeInteraction && IsInactiveDuringTransitionLink(node);
-            _nodeRenderer.DrawNode(node, includeInteraction && node == _selectedNode, _editingNode, editingDisplayLabel, editingDisplayCaretIndex, showEditingCaret, inactive);
+            _nodeRenderer.DrawNode(node, includeInteraction && node == _selectedNode, _editingNode, editingDisplayLabel, editingDisplayCaretIndex, showEditingCaret, totalGameTime, inactive);
         }
         if (includeInteraction && _selectedNode is not null && !IsInactiveDuringTransitionLink(_selectedNode))
         {

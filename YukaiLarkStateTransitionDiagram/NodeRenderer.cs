@@ -37,7 +37,7 @@ public sealed class NodeRenderer
     /// <param name="selected">選択されているかどうか</param>
     /// <param name="editingNode">編集中のノード</param>
     /// <param name="editingLabel">編集中のラベル</param>
-    public void DrawNode(DiagramNode node, bool selected, DiagramNode? editingNode, string editingLabel, int editingCaretIndex, bool showEditingCaret, bool inactive = false)
+    public void DrawNode(DiagramNode node, bool selected, DiagramNode? editingNode, string editingLabel, int editingCaretIndex, bool showEditingCaret, TimeSpan totalGameTime, bool inactive = false)
     {
         var baseFill = node.Kind == NodeKind.Normal && _palette.Length > 0
             ? _palette[node.ColorIndex % _palette.Length]
@@ -50,8 +50,17 @@ public sealed class NodeRenderer
         var normalOutlineColor = inactive ? GetInactiveColor(new Color(15, 18, 24), 0.56f) : new Color(15, 18, 24);
         var labelColor = inactive ? Theme.PanelMutedTextColor * 0.72f : Color.White;
 
+        if (selected && !inactive)
+        {
+            DrawSelectedNodeGlow(node, totalGameTime);
+        }
+
         _primitiveRenderer.DrawCircle(node.Position, node.Radius + 4, outerColor);
         _primitiveRenderer.DrawCircle(node.Position, node.Radius, fill);
+        if (selected && !inactive)
+        {
+            DrawSelectedNodeSweep(node, totalGameTime);
+        }
 
         // 通常ノード
         if (node.Kind == NodeKind.Normal)
@@ -127,6 +136,39 @@ public sealed class NodeRenderer
         var center = GetNodeResizeHandleCenter(node);
         _primitiveRenderer.DrawLine(node.Position + new Vector2(node.Radius * 0.72f, node.Radius * 0.72f), center, new Color(255, 230, 120), 2f);
         _primitiveRenderer.DrawHandle(center, new Color(255, 230, 120));
+    }
+
+    private void DrawSelectedNodeGlow(DiagramNode node, TimeSpan totalGameTime)
+    {
+        var pulse = 0.5f + (MathF.Sin((float)totalGameTime.TotalSeconds * 4.4f) * 0.5f);
+        _primitiveRenderer.DrawCircle(node.Position, node.Radius + 10f, new Color(255, 236, 145) * MathHelper.Lerp(0.12f, 0.22f, pulse));
+        _primitiveRenderer.DrawCircle(node.Position, node.Radius + 6f, new Color(255, 255, 255) * MathHelper.Lerp(0.18f, 0.28f, pulse));
+    }
+
+    private void DrawSelectedNodeSweep(DiagramNode node, TimeSpan totalGameTime)
+    {
+        var progress = (float)(totalGameTime.TotalSeconds * 0.58 % 1.0);
+        var sweepCenter = MathHelper.Lerp(-node.Radius, node.Radius, progress);
+        var sweepHalfHeight = MathF.Max(18f, node.Radius * 0.48f);
+
+        for (var y = -node.Radius; y <= node.Radius; y++)
+        {
+            var distance = MathF.Abs(y - sweepCenter);
+            if (distance > sweepHalfHeight)
+            {
+                continue;
+            }
+
+            var halfWidth = (float)Math.Sqrt(node.Radius * node.Radius - y * y);
+            var strength = 1f - (distance / sweepHalfHeight);
+            var alpha = 0.05f + (strength * 0.22f);
+            var rectangle = new Rectangle(
+                (int)(node.Position.X - halfWidth),
+                (int)(node.Position.Y + y),
+                (int)(halfWidth * 2),
+                1);
+            _primitiveRenderer.DrawPixelRectangle(rectangle, new Color(255, 255, 255) * alpha);
+        }
     }
 
     /// <summary>
