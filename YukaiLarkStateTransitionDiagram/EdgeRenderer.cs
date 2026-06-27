@@ -173,8 +173,9 @@ public sealed class EdgeRenderer
         }
 
         var texture = _getLabelTexture(label, false);
-        var center = GetTransitionLabelCenter(start, control1, control2, end, transition.LabelSide, texture);
+        var center = GetTransitionLabelCenter(start, control1, control2, end, transition, texture);
         var position = center - new Vector2(texture.Width / 2f, texture.Height / 2f);
+        DrawTransitionLabelLeader(transition, start, control1, control2, end, position, texture, selected ? 0.72f : 0.46f);
         _spriteBatch.Draw(texture, position, Theme.TransitionLabelColor);
         if (selected)
         {
@@ -219,9 +220,10 @@ public sealed class EdgeRenderer
         var isEmpty = string.IsNullOrEmpty(editingLabel);
         var displayLabel = isEmpty ? "イベント名" : editingLabel;
         var texture = _getLabelTexture(displayLabel, true);
-        var center = GetTransitionLabelCenter(start, control1, control2, end, transition.LabelSide, texture);
+        var center = GetTransitionLabelCenter(start, control1, control2, end, transition, texture);
         var position = center - new Vector2(texture.Width / 2f, texture.Height / 2f);
         var alpha = MathHelper.Clamp(opacity, 0f, 1f);
+        DrawTransitionLabelLeader(transition, start, control1, control2, end, position, texture, 0.58f * alpha);
         var labelColor = isEmpty
             ? Theme.SelectedTransitionLabelColor * (alpha * 0.62f)
             : Theme.SelectedTransitionLabelColor * alpha;
@@ -258,20 +260,59 @@ public sealed class EdgeRenderer
     /// <param name="labelSide"></param>
     /// <param name="labelTexture"></param>
     /// <returns></returns>
-    private static Vector2 GetTransitionLabelCenter(Vector2 start, Vector2 control1, Vector2 control2, Vector2 end, int labelSide, Texture2D labelTexture)
-        => GetTransitionLabelCenter(start, control1, control2, end, labelSide, labelTexture.Width, labelTexture.Height);
+    public static Vector2 GetTransitionLabelCenter(Vector2 start, Vector2 control1, Vector2 control2, Vector2 end, DiagramTransition transition, Texture2D labelTexture)
+        => GetTransitionLabelCenter(start, control1, control2, end, transition, labelTexture.Width, labelTexture.Height);
 
-    private static Vector2 GetTransitionLabelCenter(Vector2 start, Vector2 control1, Vector2 control2, Vector2 end, int labelSide, int labelWidth, int labelHeight)
+    public static Vector2 GetTransitionLabelCenter(Vector2 start, Vector2 control1, Vector2 control2, Vector2 end, DiagramTransition transition, int labelWidth, int labelHeight)
     {
-        var midpoint = CubicBezier(start, control1, control2, end, 0.5f);
-        var tangent = CubicBezierTangent(start, control1, control2, end, 0.5f);
-        var side = labelSide == 0 ? -1f : 1f;
-        if (MathF.Abs(tangent.X) >= MathF.Abs(tangent.Y))
+        var anchorT = MathHelper.Clamp(transition.LabelAnchorT, 0f, 1f);
+        var anchor = CubicBezier(start, control1, control2, end, anchorT);
+        if (transition.LabelOffset.HasValue)
         {
-            return midpoint + new Vector2(0, side * (labelHeight / 2f + 18f));
+            return anchor + transition.LabelOffset.Value;
         }
 
-        return midpoint + new Vector2(side * (labelWidth / 2f + 22f), 0);
+        var tangent = CubicBezierTangent(start, control1, control2, end, anchorT);
+        var side = transition.LabelSide == 0 ? -1f : 1f;
+        if (MathF.Abs(tangent.X) >= MathF.Abs(tangent.Y))
+        {
+            return anchor + new Vector2(0, side * (labelHeight / 2f + 18f));
+        }
+
+        return anchor + new Vector2(side * (labelWidth / 2f + 22f), 0);
+    }
+
+    public static Vector2 GetTransitionLabelAnchor(Vector2 start, Vector2 control1, Vector2 control2, Vector2 end, DiagramTransition transition)
+        => CubicBezier(start, control1, control2, end, MathHelper.Clamp(transition.LabelAnchorT, 0f, 1f));
+
+    public static Vector2 GetTransitionPoint(Vector2 start, Vector2 control1, Vector2 control2, Vector2 end, float t)
+        => CubicBezier(start, control1, control2, end, MathHelper.Clamp(t, 0f, 1f));
+
+    private void DrawTransitionLabelLeader(
+        DiagramTransition transition,
+        Vector2 start,
+        Vector2 control1,
+        Vector2 control2,
+        Vector2 end,
+        Vector2 labelPosition,
+        Texture2D texture,
+        float opacity)
+    {
+        var anchor = GetTransitionLabelAnchor(start, control1, control2, end, transition);
+        var left = labelPosition.X;
+        var top = labelPosition.Y;
+        var right = labelPosition.X + texture.Width;
+        var bottom = labelPosition.Y + texture.Height;
+        var attach = new Vector2(
+            MathHelper.Clamp(anchor.X, left, right),
+            MathHelper.Clamp(anchor.Y, top, bottom));
+
+        if (Vector2.Distance(anchor, attach) <= 10f)
+        {
+            return;
+        }
+
+        _primitiveRenderer.DrawLine(anchor, attach, Theme.TransitionGuideColor * opacity, 1f);
     }
 
     /// <summary>

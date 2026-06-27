@@ -82,6 +82,15 @@ internal sealed class YukaiLarkAssistant
             && !previousKeyboard.IsKeyDown(Keys.Enter);
     }
 
+    public bool ShouldSuppressFromKeyboard(YukaiLarkAssistantContext context, KeyboardState keyboard, KeyboardState previousKeyboard, out YukaiLarkAssistKind kind)
+    {
+        kind = GetRunnableAssistKind(context);
+        return kind == YukaiLarkAssistKind.CreateTransition
+            && context.IsNormalToEndTransitionSuggestion
+            && keyboard.IsKeyDown(Keys.Escape)
+            && !previousKeyboard.IsKeyDown(Keys.Escape);
+    }
+
     public bool ShouldRunFromMouse(YukaiLarkAssistantContext context, Point mousePosition, out YukaiLarkAssistKind kind)
     {
         kind = GetRunnableAssistKind(context);
@@ -319,7 +328,7 @@ internal sealed class YukaiLarkAssistant
             return "ユカイラーク: 通常ノード同士の遷移をつなげます。Enterか鳥をクリック。";
         }
 
-        return "ユカイラーク: 開始から一番遠い状態から終了マークへ遷移をつなげます。Enterか鳥をクリック。";
+        return "ユカイラーク: 開始から一番遠い状態から終了マークへ遷移をつなげます。Enterか鳥クリックでつなぐ、Escでつながない。";
     }
 
     private void DrawAssistBubble(
@@ -369,7 +378,7 @@ internal sealed class YukaiLarkAssistant
             return ("通常ノード同士をつなぐ？", "Enter または鳥をクリック");
         }
 
-        return ("終了マークへつなぐ？", "Enter または鳥をクリック");
+        return ("終了マークへつなぐ？", "Enterでつなぐ / Escでつながない");
     }
 
     private void DrawCompletedAssistBubble(
@@ -457,6 +466,7 @@ internal readonly record struct YukaiLarkAssistantContext(
     bool HasStartToNormalTransition,
     bool HasNormalToNormalTransition,
     bool HasNormalToEndTransition,
+    bool IsNormalToEndTransitionSuggestion,
     bool HasMissingTransitionEvent,
     string MissingTransitionEventSummary,
     bool ShouldSuggestShiftDiagramLeft,

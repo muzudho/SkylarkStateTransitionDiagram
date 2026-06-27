@@ -70,6 +70,7 @@ public class Game1 : Game
     private readonly GraphicsDeviceManager _graphics;
     private readonly List<DiagramNode> _nodes = new();
     private readonly List<DiagramTransition> _transitions = new();
+    private readonly AssistSuppressionSection _assistSuppression = new();
     private readonly Stack<DiagramDocument> _undoHistory = new();
     private readonly Stack<DiagramDocument> _redoHistory = new();
     private readonly Dictionary<string, Texture2D> _labelTextureCache = new();
@@ -103,6 +104,10 @@ public class Game1 : Game
     private DiagramTransition? _editingTransition;
     private DiagramTransition? _draggedHandleTransition;
     private TransitionHandleKind _draggedHandleKind;
+    private DiagramTransition? _draggedLabelTransition;
+    private Vector2 _labelDragOffset;
+    private Vector2 _labelDragStartMouse;
+    private bool _labelDragPlacementChanged;
     private readonly List<TransitionNodeDragSnapshot> _draggedNodeTransitionSnapshots = new();
     private DiagramNode? _resizedNode;
     private string? _currentFilePath;
@@ -319,7 +324,16 @@ public class Game1 : Game
             && _transitions.Any(t => t.SourceId == normalNodes[0].Id && t.TargetId == normalNodes[1].Id);
         var hasNormalToEndTransition = endMarker is not null
             && normalToEndSource is not null
-            && _transitions.Any(t => t.SourceId == normalToEndSource.Id && t.TargetId == endMarker.Id);
+            && (_transitions.Any(t => t.SourceId == normalToEndSource.Id && t.TargetId == endMarker.Id)
+                || IsAssistSuggestionSuppressed(
+                    AssistSuggestionKind.NormalToEndTransition,
+                    normalToEndSource.Id,
+                    endMarker.Id));
+        var isNormalToEndTransitionSuggestion = endMarker is not null
+            && normalToEndSource is not null
+            && hasStartToNormalTransition
+            && (normalNodes.Count < 2 || hasNormalToNormalTransition)
+            && !hasNormalToEndTransition;
 
         var shouldSuggestShiftDiagramLeft = TryGetDiagramShiftLeftDistance(out var shiftDiagramLeftDistance);
         var hasUnreachedNormalNode = TryGetUnreachedNormalTransitionEndpoints(out _, out _);
@@ -331,6 +345,7 @@ public class Game1 : Game
             hasStartToNormalTransition,
             hasNormalToNormalTransition,
             hasNormalToEndTransition,
+            isNormalToEndTransitionSuggestion,
             !string.IsNullOrEmpty(missingTransitionEventSummary),
             missingTransitionEventSummary,
             shouldSuggestShiftDiagramLeft,
@@ -499,6 +514,11 @@ public class Game1 : Game
         if (_yukaiLarkAssistant.ShouldRunFromKeyboard(CreateAssistantContext(), keyboard, _previousKeyboard, out var assistKind))
         {
             RunYukaiLarkAssist(assistKind);
+            return;
+        }
+        if (_yukaiLarkAssistant.ShouldSuppressFromKeyboard(CreateAssistantContext(), keyboard, _previousKeyboard, out var suppressedAssistKind))
+        {
+            SuppressYukaiLarkAssist(suppressedAssistKind);
             return;
         }
         if (IsNewKeyPress(keyboard, Keys.F2) || IsNewKeyPress(keyboard, Keys.Enter))
@@ -1176,15 +1196,21 @@ public class Game1 : Game
     }
 
     private DiagramDocument CaptureDiagramDocument()
-        => CloneDiagramDocument(new DiagramDocument { Nodes = _nodes, Transitions = _transitions });
+        => CloneDiagramDocument(new DiagramDocument
+        {
+            Data = new DiagramDataSection { Nodes = _nodes, Transitions = _transitions },
+            AssistSuppression = _assistSuppression
+        });
 
     private void ApplyDiagramDocument(DiagramDocument document)
     {
         var snapshot = CloneDiagramDocument(document);
         _nodes.Clear();
         _transitions.Clear();
+        _assistSuppression.SuppressedSuggestions.Clear();
         _nodes.AddRange(snapshot.Nodes);
         _transitions.AddRange(snapshot.Transitions);
+        _assistSuppression.SuppressedSuggestions.AddRange(snapshot.AssistSuppression.SuppressedSuggestions);
         foreach (var transition in _transitions)
         {
             InitializeTransitionEndpoints(transition);
@@ -1202,6 +1228,7 @@ public class Game1 : Game
         _fileNameEditWarning = string.Empty;
         _draggedHandleTransition = null;
         _draggedHandleKind = TransitionHandleKind.None;
+        _draggedLabelTransition = null;
         _resizedNode = null;
         _textBoxController.Clear();
         _isPanning = false;
@@ -1214,8 +1241,15 @@ public class Game1 : Game
         => new()
         {
             FormatVersion = document.FormatVersion,
-            Nodes = document.Nodes.Select(CloneDiagramNode).ToList(),
-            Transitions = document.Transitions.Select(CloneDiagramTransition).ToList()
+            Data = new DiagramDataSection
+            {
+                Nodes = document.Nodes.Select(CloneDiagramNode).ToList(),
+                Transitions = document.Transitions.Select(CloneDiagramTransition).ToList()
+            },
+            AssistSuppression = new AssistSuppressionSection
+            {
+                SuppressedSuggestions = document.AssistSuppression.SuppressedSuggestions.Select(CloneAssistSuggestionSuppression).ToList()
+            }
         };
 
     private static DiagramNode CloneDiagramNode(DiagramNode node)
@@ -1236,10 +1270,20 @@ public class Game1 : Game
             TargetId = transition.TargetId,
             Label = transition.Label,
             LabelSide = transition.LabelSide,
+            LabelAnchorT = transition.LabelAnchorT,
+            LabelOffset = transition.LabelOffset,
             SourceAngle = transition.SourceAngle,
             TargetAngle = transition.TargetAngle,
             ControlPoint1 = transition.ControlPoint1,
             ControlPoint2 = transition.ControlPoint2
+        };
+
+    private static AssistSuggestionSuppression CloneAssistSuggestionSuppression(AssistSuggestionSuppression suppression)
+        => new()
+        {
+            Kind = suppression.Kind,
+            SourceId = suppression.SourceId,
+            TargetId = suppression.TargetId
         };
 
     private static bool AreDiagramDocumentsEqual(DiagramDocument left, DiagramDocument right)
@@ -1401,6 +1445,7 @@ public class Game1 : Game
         _resizedNode = null;
         _draggedHandleTransition = null;
         _draggedHandleKind = TransitionHandleKind.None;
+        _draggedLabelTransition = null;
         _linkSource = null;
         _isPanning = false;
         _status = "PNG出力モードです。枠をドラッグで調整、Enterで撮影、右クリック/Escでキャンセル。";
@@ -1467,6 +1512,11 @@ public class Game1 : Game
             Include(control1);
             Include(control2);
             Include(end);
+            if (TryGetTransitionLabelBounds(transition, out var labelTopLeft, out var labelSize))
+            {
+                Include(labelTopLeft);
+                Include(labelTopLeft + labelSize);
+            }
         }
 
         bounds = hasBounds
@@ -2086,6 +2136,13 @@ public class Game1 : Game
                 return;
             }
 
+            var labelTransition = FindTransitionLabelAt(mousePosition);
+            if (labelTransition is not null)
+            {
+                BeginTransitionLabelDrag(labelTransition, mousePosition);
+                return;
+            }
+
             var node = FindNodeAt(mousePosition);
             var transition = node is null ? FindTransitionAt(mousePosition) : null;
             if (node is not null || transition is not null)
@@ -2132,6 +2189,14 @@ public class Game1 : Game
                 _status = "表示位置を移動中です。マウスを離すと停止します。";
             }
         }
+        if (_draggedLabelTransition is not null && mouse.LeftButton == ButtonState.Pressed)
+        {
+            if (_labelDragPlacementChanged || Vector2.DistanceSquared(mousePosition, _labelDragStartMouse) > 9f)
+            {
+                UpdateTransitionLabelPlacement(_draggedLabelTransition, mousePosition - _labelDragOffset);
+                _labelDragPlacementChanged = true;
+            }
+        }
         if (_draggedHandleTransition is not null && mouse.LeftButton == ButtonState.Pressed)
         {
             UpdateTransitionHandle(_draggedHandleTransition, _draggedHandleKind, mousePosition);
@@ -2172,6 +2237,13 @@ public class Game1 : Game
                 _linkSource = null;
             }
             _invalidLinkSource = null;
+            if (_draggedLabelTransition is not null)
+            {
+                CommitPendingHistory();
+                _status = _labelDragPlacementChanged
+                    ? "遷移ラベルの位置を更新しました。Ctrl+Sで保存できます。"
+                    : "遷移を選択しました。ラベルはドラッグで移動、F2・Enterで編集できます。";
+            }
             if (_draggedHandleTransition is not null)
             {
                 CommitPendingHistory();
@@ -2194,6 +2266,7 @@ public class Game1 : Game
             _resizedNode = null;
             _draggedHandleTransition = null;
             _draggedHandleKind = TransitionHandleKind.None;
+            _draggedLabelTransition = null;
             if (_isPanning)
             {
                 _isPanning = false;
@@ -2247,6 +2320,7 @@ public class Game1 : Game
         if (_draggedNode is not null
             || _resizedNode is not null
             || _draggedHandleTransition is not null
+            || _draggedLabelTransition is not null
             || _linkSource is not null
             || _isPanning
             || _isMiniMapDragging)
@@ -2377,6 +2451,7 @@ public class Game1 : Game
             || _draggedNode is not null
             || _resizedNode is not null
             || _draggedHandleTransition is not null
+            || _draggedLabelTransition is not null
             || _linkSource is not null
             || IsShiftDown(keyboard))
         {
@@ -2515,6 +2590,32 @@ public class Game1 : Game
             _status = result.Status;
         }
     }
+
+    private void SuppressYukaiLarkAssist(YukaiLarkAssistKind kind)
+    {
+        if (kind != YukaiLarkAssistKind.CreateTransition
+            || !TryGetNormalToEndTransitionSuggestion(out var source, out var target))
+        {
+            _status = "このアシストは抑制できません。";
+            return;
+        }
+
+        ExecuteUndoableChange(() =>
+        {
+            if (!IsAssistSuggestionSuppressed(AssistSuggestionKind.NormalToEndTransition, source.Id, target.Id))
+            {
+                _assistSuppression.SuppressedSuggestions.Add(new AssistSuggestionSuppression
+                {
+                    Kind = AssistSuggestionKind.NormalToEndTransition,
+                    SourceId = source.Id,
+                    TargetId = target.Id
+                });
+            }
+        });
+
+        _yukaiLarkAssistant.Reset();
+        _status = $"{GetNodeLabel(source.Id)} から終了マークへつなぐ提案を、この図では抑制しました。Ctrl+Sで保存できます。";
+    }
     private void AddTransition(int sourceId, int targetId)
     {
         var source = FindNode(sourceId);
@@ -2615,7 +2716,11 @@ public class Game1 : Game
     }
     private void SaveDiagramToPath(string path)
     {
-        var document = new DiagramDocument { Nodes = _nodes, Transitions = _transitions };
+        var document = new DiagramDocument
+        {
+            Data = new DiagramDataSection { Nodes = _nodes, Transitions = _transitions },
+            AssistSuppression = _assistSuppression
+        };
         YukaiDialogJsonWriter.Write(path, document);
         _currentFilePath = path;
         RememberDiagramFile(path);
@@ -2655,8 +2760,10 @@ public class Game1 : Game
         }
         _nodes.Clear();
         _transitions.Clear();
+        _assistSuppression.SuppressedSuggestions.Clear();
         _nodes.AddRange(document.Nodes);
         _transitions.AddRange(document.Transitions);
+        _assistSuppression.SuppressedSuggestions.AddRange(document.AssistSuppression.SuppressedSuggestions);
         foreach (var transition in _transitions)
         {
             InitializeTransitionEndpoints(transition);
@@ -2721,6 +2828,7 @@ public class Game1 : Game
     {
         _nodes.Clear();
         _transitions.Clear();
+        _assistSuppression.SuppressedSuggestions.Clear();
         _nextNodeId = 1;
         _selectedNode = null;
         _selectedTransition = null;
@@ -2730,6 +2838,7 @@ public class Game1 : Game
         _editingTransition = null;
         _draggedHandleTransition = null;
         _draggedHandleKind = TransitionHandleKind.None;
+        _draggedLabelTransition = null;
         _resizedNode = null;
         _textBoxController.Clear();
         _pendingHistorySnapshot = null;
@@ -2774,6 +2883,102 @@ public class Game1 : Game
         node.RadiusUnits = (int)MathF.Round(radius / DiagramNode.RadiusUnit);
     }
 
+    private DiagramTransition? FindTransitionLabelAt(Vector2 position)
+    {
+        foreach (var transition in Enumerable.Reverse(_transitions))
+        {
+            if (!CanTransitionHaveEvent(transition) || string.IsNullOrWhiteSpace(transition.Label))
+            {
+                continue;
+            }
+
+            if (!TryGetTransitionLabelBounds(transition, out var topLeft, out var size))
+            {
+                continue;
+            }
+
+            const float padding = 6f;
+            if (position.X >= topLeft.X - padding
+                && position.X <= topLeft.X + size.X + padding
+                && position.Y >= topLeft.Y - padding
+                && position.Y <= topLeft.Y + size.Y + padding)
+            {
+                return transition;
+            }
+        }
+
+        return null;
+    }
+
+    private bool TryGetTransitionLabelBounds(DiagramTransition transition, out Vector2 topLeft, out Vector2 size)
+    {
+        topLeft = Vector2.Zero;
+        size = Vector2.Zero;
+        if (string.IsNullOrWhiteSpace(transition.Label)
+            || !TryGetTransitionGeometry(transition, out var start, out var control1, out var control2, out var end))
+        {
+            return false;
+        }
+
+        var texture = GetLabelTexture(transition.Label, false);
+        var center = EdgeRenderer.GetTransitionLabelCenter(start, control1, control2, end, transition, texture.Width, texture.Height);
+        size = new Vector2(texture.Width, texture.Height);
+        topLeft = center - size / 2f;
+        return true;
+    }
+
+    private void BeginTransitionLabelDrag(DiagramTransition transition, Vector2 mousePosition)
+    {
+        if (!TryGetTransitionLabelBounds(transition, out var topLeft, out var size))
+        {
+            return;
+        }
+
+        _selectedNode = null;
+        _selectedTransition = transition;
+        _draggedNode = null;
+        _draggedHandleTransition = null;
+        _draggedHandleKind = TransitionHandleKind.None;
+        _draggedLabelTransition = transition;
+        _labelDragOffset = mousePosition - (topLeft + size / 2f);
+        _labelDragStartMouse = mousePosition;
+        _labelDragPlacementChanged = false;
+        BeginPendingHistory();
+        _status = "遷移ラベルを移動中です。線上の最寄り位置へ細い接続線を付けます。";
+    }
+
+    private void UpdateTransitionLabelPlacement(DiagramTransition transition, Vector2 labelCenter)
+    {
+        if (!TryGetTransitionGeometry(transition, out var start, out var control1, out var control2, out var end))
+        {
+            return;
+        }
+
+        var anchorT = FindNearestTransitionT(labelCenter, start, control1, control2, end);
+        var anchor = EdgeRenderer.GetTransitionPoint(start, control1, control2, end, anchorT);
+        transition.LabelAnchorT = anchorT;
+        transition.LabelOffset = labelCenter - anchor;
+    }
+
+    private static float FindNearestTransitionT(Vector2 point, Vector2 start, Vector2 control1, Vector2 control2, Vector2 end)
+    {
+        const int samples = 64;
+        var nearestT = 0f;
+        var nearestDistance = float.MaxValue;
+        for (var i = 0; i <= samples; i++)
+        {
+            var t = i / (float)samples;
+            var candidate = EdgeRenderer.GetTransitionPoint(start, control1, control2, end, t);
+            var distance = Vector2.DistanceSquared(point, candidate);
+            if (distance < nearestDistance)
+            {
+                nearestDistance = distance;
+                nearestT = t;
+            }
+        }
+
+        return nearestT;
+    }
     private DiagramTransition? FindTransitionAt(Vector2 position)
     {
         foreach (var transition in _transitions)
@@ -3284,18 +3489,8 @@ public class Game1 : Game
             return true;
         }
 
-        var normalToEndSource = startMarker is null
-            ? normalNodes.LastOrDefault()
-            : normalNodes
-                .OrderByDescending(node => (node.Position - startMarker.Position).LengthSquared())
-                .ThenBy(node => node.Id)
-                .FirstOrDefault();
-        if (endMarker is not null
-            && normalToEndSource is not null
-            && !_transitions.Any(t => t.SourceId == normalToEndSource.Id && t.TargetId == endMarker.Id))
+        if (TryGetNormalToEndTransitionSuggestion(out source, out target))
         {
-            source = normalToEndSource;
-            target = endMarker;
             return true;
         }
 
@@ -3308,6 +3503,43 @@ public class Game1 : Game
         target = null!;
         return false;
     }
+
+    private bool TryGetNormalToEndTransitionSuggestion(out DiagramNode source, out DiagramNode target)
+    {
+        var startMarker = _nodes.FirstOrDefault(node => node.Kind == NodeKind.StartMarker);
+        var endMarker = _nodes.FirstOrDefault(node => node.Kind == NodeKind.EndMarker);
+        var normalNodes = _nodes
+            .Where(node => node.Kind == NodeKind.Normal)
+            .OrderBy(node => node.Id)
+            .ToList();
+        var normalToEndSource = startMarker is null
+            ? normalNodes.LastOrDefault()
+            : normalNodes
+                .OrderByDescending(node => (node.Position - startMarker.Position).LengthSquared())
+                .ThenBy(node => node.Id)
+                .FirstOrDefault();
+
+        if (endMarker is not null
+            && normalToEndSource is not null
+            && !_transitions.Any(t => t.SourceId == normalToEndSource.Id && t.TargetId == endMarker.Id)
+            && !IsAssistSuggestionSuppressed(AssistSuggestionKind.NormalToEndTransition, normalToEndSource.Id, endMarker.Id))
+        {
+            source = normalToEndSource;
+            target = endMarker;
+            return true;
+        }
+
+        source = null!;
+        target = null!;
+        return false;
+    }
+
+    private bool IsAssistSuggestionSuppressed(AssistSuggestionKind kind, int sourceId, int targetId)
+        => _assistSuppression.SuppressedSuggestions.Any(suppression =>
+            suppression.Kind == kind
+            && suppression.SourceId == sourceId
+            && suppression.TargetId == targetId);
+
     private void DrawTransitionEventGhost(TimeSpan totalGameTime)
     {
         var context = CreateAssistantContext();
@@ -3886,11 +4118,48 @@ public class Game1 : Game
 }
 public sealed class DiagramDocument
 {
-    public const int CurrentFormatVersion = 1;
+    public const int CurrentFormatVersion = 2;
 
     public int FormatVersion { get; set; } = CurrentFormatVersion;
+    public DiagramDataSection Data { get; set; } = new();
+    public AssistSuppressionSection AssistSuppression { get; set; } = new();
+
+    [JsonIgnore]
+    public List<DiagramNode> Nodes
+    {
+        get => Data.Nodes;
+        set => Data.Nodes = value ?? new List<DiagramNode>();
+    }
+
+    [JsonIgnore]
+    public List<DiagramTransition> Transitions
+    {
+        get => Data.Transitions;
+        set => Data.Transitions = value ?? new List<DiagramTransition>();
+    }
+}
+
+public sealed class DiagramDataSection
+{
     public List<DiagramNode> Nodes { get; set; } = new();
     public List<DiagramTransition> Transitions { get; set; } = new();
+}
+
+public sealed class AssistSuppressionSection
+{
+    public List<AssistSuggestionSuppression> SuppressedSuggestions { get; set; } = new();
+}
+
+public sealed class AssistSuggestionSuppression
+{
+    public AssistSuggestionKind Kind { get; set; }
+    public int SourceId { get; set; }
+    public int TargetId { get; set; }
+}
+
+public enum AssistSuggestionKind
+{
+    NormalToEndTransition = 1
 }
 public sealed class DiagramNode
 {
@@ -3925,6 +4194,8 @@ public sealed class DiagramTransition
     public int TargetId { get; set; }
     public string Label { get; set; } = string.Empty;
     public int LabelSide { get; set; }
+    public float LabelAnchorT { get; set; } = 0.5f;
+    public Vector2? LabelOffset { get; set; }
     public float? SourceAngle { get; set; }
     public float? TargetAngle { get; set; }
     public Vector2? ControlPoint1 { get; set; }
@@ -4130,3 +4401,4 @@ public static class PrimitiveText
         }
     }
 }
+
