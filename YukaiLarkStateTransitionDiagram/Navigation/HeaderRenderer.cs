@@ -38,17 +38,63 @@ public sealed class HeaderRenderer : IDisposable
     /// <param name="viewport">描画領域のビューポート</param>
     /// <param name="title">表示タイトル</param>
     /// <param name="status">現在の状態メッセージ</param>
-    public void DrawHeader(Viewport viewport, string title, string status, BoardTheme theme)
+    public void DrawHeader(
+        Viewport viewport,
+        string title,
+        string status,
+        BoardTheme theme,
+        bool isEditingTitle = false,
+        string editingTitle = "",
+        int editingCaretIndex = 0,
+        bool showEditingCaret = false,
+        string titleWarning = "")
     {
         var bounds = new Rectangle(0, 0, viewport.Width, 58);
         _spriteBatch.Draw(_pixel, bounds, theme.HeaderBackgroundColor);
         _spriteBatch.Draw(_pixel, new Rectangle(0, bounds.Height - 1, viewport.Width, 1), theme.HeaderBorderColor);
 
-        // タイトルの描画
-        DrawUiText(title, new Vector2(12, 8), theme.HeaderTitleTextColor, 18, true);
+        if (isEditingTitle)
+        {
+            DrawTitleEditor(viewport, editingTitle, editingCaretIndex, showEditingCaret, theme);
+        }
+        else
+        {
+            // タイトルの描画
+            DrawUiText(title, new Vector2(12, 8), theme.HeaderTitleTextColor, 18, true);
+        }
 
         // 状態メッセージの描画
-        DrawUiText(status, new Vector2(12, 32), theme.HeaderStatusTextColor, 16, false);
+        DrawUiText(string.IsNullOrEmpty(titleWarning) ? status : titleWarning, new Vector2(12, 32), theme.HeaderStatusTextColor, 16, false);
+    }
+
+    public static Rectangle GetTitleHitBounds(Viewport viewport)
+        => new(8, 4, Math.Min(520, Math.Max(120, viewport.Width - 24)), 28);
+
+    private void DrawTitleEditor(Viewport viewport, string editingTitle, int editingCaretIndex, bool showEditingCaret, BoardTheme theme)
+    {
+        var editBounds = GetTitleHitBounds(viewport);
+        _spriteBatch.Draw(_pixel, editBounds, Color.White * 0.16f);
+        DrawRectangleOutline(editBounds, theme.HeaderBorderColor);
+
+        var textPosition = new Vector2(editBounds.X + 5, editBounds.Y + 3);
+        DrawUiText(editingTitle, textPosition, theme.HeaderTitleTextColor, 18, true);
+        if (!showEditingCaret)
+        {
+            return;
+        }
+
+        var clampedCaretIndex = Math.Clamp(editingCaretIndex, 0, editingTitle.Length);
+        var caretX = textPosition.X + TextRenderer.MeasureUiTextCaretOffset(editingTitle, clampedCaretIndex, 18, true);
+        var caretBounds = new Rectangle((int)MathF.Round(caretX), editBounds.Y + 5, 2, editBounds.Height - 10);
+        _spriteBatch.Draw(_pixel, caretBounds, theme.HeaderTitleTextColor);
+    }
+
+    private void DrawRectangleOutline(Rectangle rectangle, Color color)
+    {
+        _spriteBatch.Draw(_pixel, new Rectangle(rectangle.X, rectangle.Y, rectangle.Width, 1), color);
+        _spriteBatch.Draw(_pixel, new Rectangle(rectangle.X, rectangle.Bottom - 1, rectangle.Width, 1), color);
+        _spriteBatch.Draw(_pixel, new Rectangle(rectangle.X, rectangle.Y, 1, rectangle.Height), color);
+        _spriteBatch.Draw(_pixel, new Rectangle(rectangle.Right - 1, rectangle.Y, 1, rectangle.Height), color);
     }
 
     /// <summary>

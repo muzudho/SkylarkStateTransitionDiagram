@@ -30,6 +30,7 @@ public class Game1 : Game
     private const float ExportFlashDurationSeconds = 0.18f;
     private const float ExportPhotoPreviewDurationSeconds = 1.35f;
     private const int RecentFileMenuMaxItems = AppConfig.MaxRecentFiles;
+    private const int MaxFileNameLength = 255;
     private const string YukaiLarkMascotTexturePath = "Assets/BrandLogo/yukai-lark-logo.png";
     private static readonly Keys[] ThemeDigitKeys =
     [
@@ -77,6 +78,7 @@ public class Game1 : Game
     private Texture2D? _yukaiLarkMascotTexture;
     private readonly YukaiLarkAssistant _yukaiLarkAssistant = new();
     private readonly TextBoxController _textBoxController = new(24);
+    private readonly TextBoxController _fileNameTextBoxController = new(MaxFileNameLength);
     private AppConfig _appConfig = new();
 
     private MouseState _previousMouse;
@@ -103,6 +105,7 @@ public class Game1 : Game
     private bool _isExportSelecting;
     private bool _isFileMenuOpen;
     private bool _isStartupFileMenu;
+    private bool _isEditingFileName;
     private bool _exportSelectionDragging;
     private bool _hasExportSelection;
     private Rectangle _exportSelectionRectangle;
@@ -114,6 +117,7 @@ public class Game1 : Game
     private float _exportPhotoPreviewSecondsRemaining;
     private int _nextNodeId = 1;
     private string _status = DefaultStatus;
+    private string _fileNameEditWarning = string.Empty;
     private const string DefaultStatus = "N: 状態追加 / S: 開始マーク / Shift+ドラッグ: 遷移作成 / F2・Enter: ラベル編集 / Ctrl+Z/Y: 元に戻す/やり直し / Ctrl+S: 保存";
     public Game1()
     {
@@ -178,6 +182,11 @@ public class Game1 : Game
                 HandleExportSelectionMouse(keyboard, mouse);
             }
         }
+        else if (_isEditingFileName)
+        {
+            _fileNameTextBoxController.UpdateImeComposition();
+            HandleFileNameEditingKeyboard(keyboard);
+        }
         else if (IsEditingLabel)
         {
             _textBoxController.UpdateImeComposition();
@@ -204,7 +213,16 @@ public class Game1 : Game
         DrawDiagramScene(GetViewMatrix(), includeInteraction: true, gameTime.TotalGameTime);
 
         _spriteBatch.Begin(samplerState: SamplerState.LinearClamp);
-        _headerRenderer.DrawHeader(GraphicsDevice.Viewport, GetHeaderTitle(), _status, _boardTheme);
+        _headerRenderer.DrawHeader(
+            GraphicsDevice.Viewport,
+            GetHeaderTitle(),
+            _status,
+            _boardTheme,
+            _isEditingFileName,
+            _fileNameTextBoxController.GetDisplayText(),
+            _fileNameTextBoxController.GetDisplayCaretIndex(),
+            ((int)(gameTime.TotalGameTime.TotalSeconds * 2)) % 2 == 0,
+            _fileNameEditWarning);
 
         // ［開始マーク作成アシスト］の描画
         DrawYukaiLarkMascot(GraphicsDevice.Viewport, gameTime.TotalGameTime);
@@ -284,6 +302,7 @@ public class Game1 : Game
             shouldSuggestShiftDiagramLeft,
             shiftDiagramLeftDistance,
             !IsEditingLabel
+                && !_isEditingFileName
                 && !_isExportSelecting
                 && !_isPanning
                 && _draggedNode is null
@@ -351,6 +370,18 @@ public class Game1 : Game
 
     private void OnTextInput(object? sender, TextInputEventArgs e)
     {
+        if (_isEditingFileName)
+        {
+            if (!_fileNameTextBoxController.TryInputCharacter(e.Character))
+            {
+                _fileNameEditWarning = "ファイル名は255文字までです。";
+                return;
+            }
+
+            UpdateFileNameEditWarning();
+            return;
+        }
+
         if (!IsEditingLabel)
         {
             return;
@@ -832,6 +863,9 @@ public class Game1 : Game
         _linkSource = null;
         _editingNode = null;
         _editingTransition = null;
+        _isEditingFileName = false;
+        _fileNameTextBoxController.Clear();
+        _fileNameEditWarning = string.Empty;
         _draggedHandleTransition = null;
         _draggedHandleKind = TransitionHandleKind.None;
         _resizedNode = null;
@@ -1387,6 +1421,222 @@ public class Game1 : Game
         _textBoxController.Clear();
         _status = "ラベル編集をキャンセルしました。";
     }
+
+    private void HandleFileNameEditingKeyboard(KeyboardState keyboard)
+    {
+        switch (_fileNameTextBoxController.HandleKeyboard(keyboard, _previousKeyboard))
+        {
+            case TextBoxKeyboardAction.Commit:
+                CommitFileNameEdit();
+                break;
+            case TextBoxKeyboardAction.Cancel:
+                CancelFileNameEdit();
+                break;
+            default:
+                UpdateFileNameEditWarning();
+                break;
+        }
+    }
+
+    private void BeginFileNameEdit()
+    {
+        if (_currentFilePath is null)
+        {
+            _status = "未保存の図はまだ保存先がありません。Ctrl+Sで保存先とファイル名を指定してください。";
+            return;
+        }
+
+        _isEditingFileName = true;
+        _editingNode = null;
+        _editingTransition = null;
+        _draggedNode = null;
+        _resizedNode = null;
+        _linkSource = null;
+        _isPanning = false;
+        _fileNameTextBoxController.Begin(Path.GetFileName(_currentFilePath));
+        UpdateFileNameEditWarning();
+        _status = "ファイル名を編集中です。Enterで変更、Escでキャンセルします。";
+    }
+
+    private void CommitFileNameEdit()
+    {
+        if (!TryValidateFileNameEdit(_fileNameTextBoxController.Text, out var targetPath, out var warning))
+        {
+            _fileNameEditWarning = warning;
+            return;
+        }
+
+        if (_currentFilePath is null)
+        {
+            CancelFileNameEdit();
+            return;
+        }
+
+        var oldPath = _currentFilePath;
+        if (string.Equals(Path.GetFullPath(oldPath), Path.GetFullPath(targetPath), StringComparison.Ordinal))
+        {
+            _status = "ファイル名は変更されていません。";
+            CancelFileNameEdit(keepStatus: true);
+            return;
+        }
+
+        try
+        {
+            MoveFileAllowingCaseChange(oldPath, targetPath);
+            _currentFilePath = targetPath;
+            _appConfig.RecentFiles.RemoveAll(file => string.Equals(file, oldPath, StringComparison.OrdinalIgnoreCase));
+            RememberDiagramFile(targetPath);
+            _status = $"ファイル名を {Path.GetFileName(targetPath)} に変更しました。";
+            CancelFileNameEdit(keepStatus: true);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
+        {
+            _fileNameEditWarning = "ファイル名を変更できませんでした。権限、使用中、パスの長さを確認してください。";
+        }
+    }
+
+    private void CancelFileNameEdit(bool keepStatus = false)
+    {
+        _isEditingFileName = false;
+        _fileNameTextBoxController.Clear();
+        _fileNameEditWarning = string.Empty;
+        if (!keepStatus)
+        {
+            _status = "ファイル名編集をキャンセルしました。";
+        }
+    }
+
+    private void UpdateFileNameEditWarning()
+    {
+        TryValidateFileNameEdit(_fileNameTextBoxController.Text, out _, out _fileNameEditWarning);
+    }
+
+    private bool TryValidateFileNameEdit(string text, out string targetPath, out string warning)
+    {
+        targetPath = string.Empty;
+        var fileName = text;
+        if (_currentFilePath is null)
+        {
+            warning = "未保存の図はCtrl+Sで保存先を指定してください。";
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(fileName))
+        {
+            warning = "ファイル名を入力してください。";
+            return false;
+        }
+
+        if (fileName.StartsWith(' '))
+        {
+            warning = "先頭が空白のファイル名は避けてください。";
+            return false;
+        }
+
+        if (fileName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+        {
+            warning = "ファイル名に使えない文字が入っています。";
+            return false;
+        }
+
+        if (fileName.EndsWith(' ') || fileName.EndsWith('.'))
+        {
+            warning = "Windowsでは末尾が空白またはピリオドのファイル名は使えません。";
+            return false;
+        }
+
+        if (fileName.Length > MaxFileNameLength)
+        {
+            warning = "ファイル名は255文字までです。";
+            return false;
+        }
+
+        if (IsReservedWindowsFileName(fileName))
+        {
+            warning = "Windowsの予約名はファイル名に使えません。";
+            return false;
+        }
+
+        var directory = Path.GetDirectoryName(_currentFilePath);
+        if (string.IsNullOrWhiteSpace(directory))
+        {
+            warning = "保存先フォルダーを確認できません。Ctrl+Shift+Sで保存し直してください。";
+            return false;
+        }
+
+        try
+        {
+            targetPath = Path.GetFullPath(Path.Combine(directory, fileName));
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            warning = "ファイル名から作るパスが無効です。";
+            return false;
+        }
+
+        var currentFullPath = Path.GetFullPath(_currentFilePath);
+        if (targetPath.Length >= 260)
+        {
+            warning = "フルパスが長すぎます。短いファイル名にしてください。";
+            return false;
+        }
+
+        if (File.Exists(targetPath) && !string.Equals(targetPath, currentFullPath, StringComparison.OrdinalIgnoreCase))
+        {
+            warning = "同じ名前のファイルが既にあります。別の名前にしてください。";
+            return false;
+        }
+
+        warning = string.Empty;
+        return true;
+    }
+
+    private static void MoveFileAllowingCaseChange(string oldPath, string targetPath)
+    {
+        var oldFullPath = Path.GetFullPath(oldPath);
+        var targetFullPath = Path.GetFullPath(targetPath);
+        if (!string.Equals(oldFullPath, targetFullPath, StringComparison.OrdinalIgnoreCase))
+        {
+            File.Move(oldPath, targetPath);
+            return;
+        }
+
+        var directory = Path.GetDirectoryName(oldFullPath) ?? string.Empty;
+        var temporaryPath = Path.Combine(directory, $".{Guid.NewGuid():N}.rename.tmp");
+        File.Move(oldFullPath, temporaryPath);
+        try
+        {
+            File.Move(temporaryPath, targetFullPath);
+        }
+        catch
+        {
+            if (File.Exists(temporaryPath) && !File.Exists(oldFullPath))
+            {
+                File.Move(temporaryPath, oldFullPath);
+            }
+
+            throw;
+        }
+    }
+
+    private static bool IsReservedWindowsFileName(string fileName)
+    {
+        var stem = Path.GetFileNameWithoutExtension(fileName).TrimEnd(' ', '.');
+        if (string.IsNullOrEmpty(stem))
+        {
+            return false;
+        }
+
+        var upper = stem.ToUpperInvariant();
+        return upper is "CON" or "PRN" or "AUX" or "NUL"
+            || IsReservedWindowsDeviceName(upper, "COM")
+            || IsReservedWindowsDeviceName(upper, "LPT");
+    }
+
+    private static bool IsReservedWindowsDeviceName(string stem, string prefix)
+        => stem.Length == 4
+            && stem.StartsWith(prefix, StringComparison.Ordinal)
+            && stem[3] is >= '1' and <= '9';
     private void ToggleTransitionLabelSide(DiagramTransition transition)
     {
         ExecuteUndoableChange(() =>
@@ -1405,6 +1655,12 @@ public class Game1 : Game
         var snapNodes = !IsAltDown(keyboard);
         if (leftPressed)
         {
+            if (HeaderRenderer.GetTitleHitBounds(GraphicsDevice.Viewport).Contains(mouse.Position))
+            {
+                BeginFileNameEdit();
+                return;
+            }
+
             if (_yukaiLarkAssistant.ShouldRunFromMouse(CreateAssistantContext(), mouse.Position, out var assistKind))
             {
                 RunYukaiLarkAssist(assistKind);
@@ -1641,7 +1897,7 @@ public class Game1 : Game
             return MouseCursor.SizeAll;
         }
 
-        if (_isFileMenuOpen || _isExportSelecting || IsEditingLabel)
+        if (_isFileMenuOpen || _isExportSelecting || IsEditingLabel || _isEditingFileName)
         {
             return MouseCursor.Arrow;
         }
@@ -2293,7 +2549,7 @@ public class Game1 : Game
     }
     private void DrawHoverCue()
     {
-        if (IsEditingLabel || _draggedNode is not null || _resizedNode is not null || _draggedHandleTransition is not null || _isPanning || _linkSource is not null)
+        if (IsEditingLabel || _isEditingFileName || _draggedNode is not null || _resizedNode is not null || _draggedHandleTransition is not null || _isPanning || _linkSource is not null)
         {
             return;
         }

@@ -113,6 +113,38 @@ public static class TextRenderer
         return measureGraphics.MeasureString(text, font, 512, StringFormatNoWrap).Width;
     }
 
+    public static float MeasureUiTextWidth(string text, float size, bool bold)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return 0f;
+        }
+
+        using var font = CreateJapaneseFont(size, bold);
+        using var measureBitmap = new DrawingBitmap(1, 1);
+        using var measureGraphics = DrawingGraphics.FromImage(measureBitmap);
+        return measureGraphics.MeasureString(text, font, 1024, StringFormatNoWrap).Width;
+    }
+
+    public static float MeasureUiTextCaretOffset(string text, int caretIndex, float size, bool bold)
+    {
+        if (string.IsNullOrEmpty(text) || caretIndex <= 0)
+        {
+            return 0f;
+        }
+
+        var clampedCaretIndex = Math.Clamp(caretIndex, 0, text.Length);
+        using var font = CreateJapaneseFont(size, bold);
+        using var measureBitmap = new DrawingBitmap(1, 1);
+        using var measureGraphics = DrawingGraphics.FromImage(measureBitmap);
+        measureGraphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
+        using var format = (DrawingStringFormat)LeftAlignedStringFormat.Clone();
+        format.FormatFlags |= DrawingStringFormatFlags.MeasureTrailingSpaces;
+        format.SetMeasurableCharacterRanges(new[] { new System.Drawing.CharacterRange(0, clampedCaretIndex) });
+        using var region = measureGraphics.MeasureCharacterRanges(text, font, new DrawingRectangleF(0, 0, 1024, 64), format)[0];
+        return region.GetBounds(measureGraphics).Right;
+    }
+
     /// <summary>
     /// 日本語を描画しやすいフォントを作成する。
     /// </summary>
