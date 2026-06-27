@@ -65,15 +65,15 @@ public sealed class EdgeRenderer
             return;
         }
 
-        _primitiveRenderer.DrawHandle(points[0], Theme.TransitionHandleColor);
-        _primitiveRenderer.DrawHandle(points[^1], Theme.TransitionHandleColor);
+        _primitiveRenderer.DrawHandle(points[0], Theme.TransitionHandleColor, Theme.HandleOutlineColor);
+        _primitiveRenderer.DrawHandle(points[^1], Theme.TransitionHandleColor, Theme.HandleOutlineColor);
         for (var i = 0; i < points.Count - 1; i++)
         {
             GetTransitionPathSegmentControlPoints(points, i, transition.SegmentControls, out var control1, out var control2);
             _primitiveRenderer.DrawLine(points[i], control1, Theme.TransitionGuideColor, 1f);
             _primitiveRenderer.DrawLine(points[i + 1], control2, Theme.TransitionGuideColor, 1f);
-            _primitiveRenderer.DrawHandle(control1, Theme.TransitionControlHandleColor);
-            _primitiveRenderer.DrawHandle(control2, Theme.TransitionControlHandleColor);
+            _primitiveRenderer.DrawHandle(control1, Theme.TransitionControlHandleColor, Theme.HandleOutlineColor);
+            _primitiveRenderer.DrawHandle(control2, Theme.TransitionControlHandleColor, Theme.HandleOutlineColor);
         }
         for (var i = 1; i < points.Count - 1; i++)
         {
@@ -154,17 +154,17 @@ public sealed class EdgeRenderer
     {
         _primitiveRenderer.DrawLine(start, control1, Theme.TransitionGuideColor, 1f);
         _primitiveRenderer.DrawLine(end, control2, Theme.TransitionGuideColor, 1f);
-        _primitiveRenderer.DrawHandle(start, Theme.TransitionHandleColor);
-        _primitiveRenderer.DrawHandle(end, Theme.TransitionHandleColor);
-        _primitiveRenderer.DrawHandle(control1, Theme.TransitionControlHandleColor);
-        _primitiveRenderer.DrawHandle(control2, Theme.TransitionControlHandleColor);
+        _primitiveRenderer.DrawHandle(start, Theme.TransitionHandleColor, Theme.HandleOutlineColor);
+        _primitiveRenderer.DrawHandle(end, Theme.TransitionHandleColor, Theme.HandleOutlineColor);
+        _primitiveRenderer.DrawHandle(control1, Theme.TransitionControlHandleColor, Theme.HandleOutlineColor);
+        _primitiveRenderer.DrawHandle(control2, Theme.TransitionControlHandleColor, Theme.HandleOutlineColor);
     }
 
 
     public void DrawTransitionEndpointHandles(Vector2 start, Vector2 end)
     {
-        _primitiveRenderer.DrawHandle(start, Theme.TransitionHandleColor);
-        _primitiveRenderer.DrawHandle(end, Theme.TransitionHandleColor);
+        _primitiveRenderer.DrawHandle(start, Theme.TransitionHandleColor, Theme.HandleOutlineColor);
+        _primitiveRenderer.DrawHandle(end, Theme.TransitionHandleColor, Theme.HandleOutlineColor);
     }
 
     /// <summary>
@@ -239,7 +239,7 @@ public sealed class EdgeRenderer
         var center = GetTransitionPathLabelCenter(points, transition, texture.Width, texture.Height);
         var position = center - new Vector2(texture.Width / 2f, texture.Height / 2f);
         DrawTransitionPathLabelLeader(transition, points, position, texture, selected ? 0.72f : 0.46f);
-        _spriteBatch.Draw(texture, position, Theme.TransitionLabelColor);
+        _spriteBatch.Draw(texture, position, selected ? Theme.SelectedTransitionLabelColor : Theme.TransitionLabelColor);
         if (selected)
         {
             DrawSelectedTransitionLabelUnderline(position, texture, label);
@@ -262,15 +262,16 @@ public sealed class EdgeRenderer
         var alpha = MathHelper.Clamp(opacity, 0f, 1f);
         DrawTransitionPathLabelLeader(transition, points, position, texture, 0.58f * alpha);
         var labelColor = isEmpty
-            ? Theme.SelectedTransitionLabelColor * (alpha * 0.62f)
-            : Theme.SelectedTransitionLabelColor * alpha;
+            ? Theme.LabelEditorPlaceholderTextColor * alpha
+            : Theme.LabelEditorTextColor * alpha;
+        DrawLabelEditorBackground(position, texture);
         _spriteBatch.Draw(texture, position, labelColor);
 
         if (showCaret && alpha > 0f)
         {
             var caretLabel = isEmpty ? displayLabel : editingLabel;
             var caretIndex = isEmpty ? 0 : Math.Clamp(editingCaretIndex, 0, caretLabel.Length);
-            DrawEditingCaret(position, texture, caretLabel, caretIndex, Theme.SelectedTransitionLabelColor * alpha);
+            DrawEditingCaret(position, texture, caretLabel, caretIndex, Theme.LabelEditorTextColor * alpha);
         }
     }
 
@@ -346,7 +347,7 @@ public sealed class EdgeRenderer
         var center = GetTransitionLabelCenter(start, control1, control2, end, transition, texture);
         var position = center - new Vector2(texture.Width / 2f, texture.Height / 2f);
         DrawTransitionLabelLeader(transition, start, control1, control2, end, position, texture, selected ? 0.72f : 0.46f);
-        _spriteBatch.Draw(texture, position, Theme.TransitionLabelColor);
+        _spriteBatch.Draw(texture, position, selected ? Theme.SelectedTransitionLabelColor : Theme.TransitionLabelColor);
         if (selected)
         {
             DrawSelectedTransitionLabelUnderline(position, texture, label);
@@ -395,16 +396,27 @@ public sealed class EdgeRenderer
         var alpha = MathHelper.Clamp(opacity, 0f, 1f);
         DrawTransitionLabelLeader(transition, start, control1, control2, end, position, texture, 0.58f * alpha);
         var labelColor = isEmpty
-            ? Theme.SelectedTransitionLabelColor * (alpha * 0.62f)
-            : Theme.SelectedTransitionLabelColor * alpha;
+            ? Theme.LabelEditorPlaceholderTextColor * alpha
+            : Theme.LabelEditorTextColor * alpha;
+        DrawLabelEditorBackground(position, texture);
         _spriteBatch.Draw(texture, position, labelColor);
 
         if (showCaret && alpha > 0f)
         {
             var caretLabel = isEmpty ? displayLabel : editingLabel;
             var caretIndex = isEmpty ? 0 : Math.Clamp(editingCaretIndex, 0, caretLabel.Length);
-            DrawEditingCaret(position, texture, caretLabel, caretIndex, Theme.SelectedTransitionLabelColor * alpha);
+            DrawEditingCaret(position, texture, caretLabel, caretIndex, Theme.LabelEditorTextColor * alpha);
         }
+    }
+
+    private void DrawLabelEditorBackground(Vector2 position, Texture2D texture)
+    {
+        var bounds = new Rectangle((int)position.X, (int)position.Y, texture.Width, texture.Height);
+        _primitiveRenderer.DrawPixelRectangle(bounds, Theme.LabelEditorBackgroundColor);
+        _primitiveRenderer.DrawLine(new Vector2(bounds.Left, bounds.Top), new Vector2(bounds.Right, bounds.Top), Theme.LabelEditorBorderColor, 2f);
+        _primitiveRenderer.DrawLine(new Vector2(bounds.Right, bounds.Top), new Vector2(bounds.Right, bounds.Bottom), Theme.LabelEditorBorderColor, 2f);
+        _primitiveRenderer.DrawLine(new Vector2(bounds.Right, bounds.Bottom), new Vector2(bounds.Left, bounds.Bottom), Theme.LabelEditorBorderColor, 2f);
+        _primitiveRenderer.DrawLine(new Vector2(bounds.Left, bounds.Bottom), new Vector2(bounds.Left, bounds.Top), Theme.LabelEditorBorderColor, 2f);
     }
 
     private void DrawEditingCaret(Vector2 texturePosition, Texture2D texture, string label, int caretIndex, Color color)

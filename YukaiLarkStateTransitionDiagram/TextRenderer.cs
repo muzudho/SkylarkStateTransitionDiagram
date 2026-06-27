@@ -95,12 +95,6 @@ public static class TextRenderer
         using var graphics = DrawingGraphics.FromImage(bitmap);
         graphics.Clear(DrawingColor.Transparent);
         graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
-        if (editing)
-        {
-            using var editBrush = new System.Drawing.SolidBrush(DrawingColor.FromArgb(170, 20, 24, 30));
-            graphics.FillRectangle(editBrush, 0, 0, width, height);
-        }
-
         graphics.DrawString(text, font, DrawingBrushes.White, new DrawingRectangleF(0, 0, width, height), CenteredStringFormat);
         return CreateTexture(graphicsDevice, bitmap, width, height);
     }

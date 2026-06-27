@@ -63,6 +63,29 @@ public sealed record BoardTheme(
         ? PhotoPaperColor
         : WithAlpha(PhotoPaperColor, 248);
 
+    public Color NodeGhostHaloColor => WithAlpha(SelectedTransitionLineColor, IsLightBackground ? (byte)88 : (byte)108);
+    public Color NodeGhostInnerHaloColor => WithAlpha(PhotoPaperColor, IsLightBackground ? (byte)82 : (byte)98);
+    public Color NodeResizeHandleColor => SelectedTransitionLineColor;
+    public Color NodeSelectedGlowColor => SelectedTransitionLineColor;
+    public Color NodeSelectedInnerGlowColor => IsLightBackground
+        ? WithAlpha(PhotoPaperColor, 232)
+        : WithAlpha(SelectedTransitionLabelColor, 232);
+    public Color NodeSelectedSweepColor => IsLightBackground
+        ? WithAlpha(PhotoPaperColor, 230)
+        : WithAlpha(SelectedTransitionLabelColor, 230);
+    public Color LabelEditorBackgroundColor => IsLightBackground
+        ? WithAlpha(PhotoPaperColor, 236)
+        : WithAlpha(Blend(BackgroundColor, Color.Black, 0.26f), 226);
+    public Color LabelEditorBorderColor => WithAlpha(SelectedTransitionLineColor, 214);
+    public Color LabelEditorTextColor => IsLightBackground
+        ? TransitionLabelColor
+        : WithAlpha(PhotoPaperColor, 248);
+    public Color LabelEditorPlaceholderTextColor => IsLightBackground
+        ? WithAlpha(Blend(TransitionLabelColor, BackgroundColor, 0.38f), 220)
+        : WithAlpha(Blend(PhotoPaperColor, BackgroundColor, 0.34f), 220);
+    public Color HandleOutlineColor => IsLightBackground
+        ? WithAlpha(Blend(TransitionLabelColor, BackgroundColor, 0.10f), 232)
+        : WithAlpha(Blend(BackgroundColor, PhotoPaperColor, 0.18f), 232);
     public Color AssistantBubbleColor => IsLightBackground
         ? WithAlpha(PhotoPaperColor, 238)
         : WithAlpha(Blend(BackgroundColor, GridColor, 0.58f), 238);

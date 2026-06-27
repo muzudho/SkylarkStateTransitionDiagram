@@ -83,10 +83,11 @@ public sealed class NodeRenderer
 
         if (node == editingNode)
         {
-            DrawNodeLabel(editingLabel, node.Position, editing: true, labelColor);
+            var editorLabelColor = inactive ? labelColor : Theme.LabelEditorTextColor;
+            DrawNodeLabel(editingLabel, node.Position, editing: true, editorLabelColor);
             if (showEditingCaret)
             {
-                DrawEditingCaret(editingLabel, editingCaretIndex, node.Position, labelColor);
+                DrawEditingCaret(editingLabel, editingCaretIndex, node.Position, editorLabelColor);
             }
         }
         else
@@ -103,8 +104,8 @@ public sealed class NodeRenderer
     public void DrawStartMarkerGhost(DiagramNode node, float opacity)
     {
         var alpha = MathHelper.Clamp(opacity, 0f, 1f);
-        _primitiveRenderer.DrawCircle(node.Position, node.Radius + 8f, new Color(110, 185, 230) * (alpha * 0.32f));
-        _primitiveRenderer.DrawCircle(node.Position, node.Radius + 4f, new Color(255, 255, 255) * (alpha * 0.34f));
+        _primitiveRenderer.DrawCircle(node.Position, node.Radius + 8f, Theme.NodeGhostHaloColor * (alpha * 0.32f));
+        _primitiveRenderer.DrawCircle(node.Position, node.Radius + 4f, Theme.NodeGhostInnerHaloColor * (alpha * 0.34f));
         _primitiveRenderer.DrawCircle(node.Position, node.Radius, Theme.MarkerFillColor * (alpha * 0.46f));
         _primitiveRenderer.DrawCircleOutline(node.Position, node.Radius - 1f, Theme.MarkerOutlineColor * (alpha * 0.74f), 5f);
         DrawNodeLabel(node.Label, node.Position, editing: false, Theme.NodeLabelTextColor * (alpha * 0.74f));
@@ -120,10 +121,10 @@ public sealed class NodeRenderer
         var alpha = MathHelper.Clamp(opacity, 0f, 1f);
         var fill = _palette.Length > 0
             ? _palette[node.ColorIndex % _palette.Length]
-            : new Color(60, 130, 220);
+            : Theme.SelectedTransitionLineColor;
 
         _primitiveRenderer.DrawCircle(node.Position, node.Radius + 8f, fill * (alpha * 0.26f));
-        _primitiveRenderer.DrawCircle(node.Position, node.Radius + 4f, new Color(255, 255, 255) * (alpha * 0.3f));
+        _primitiveRenderer.DrawCircle(node.Position, node.Radius + 4f, Theme.NodeGhostInnerHaloColor * (alpha * 0.3f));
         _primitiveRenderer.DrawCircle(node.Position, node.Radius, fill * (alpha * 0.54f));
         _primitiveRenderer.DrawCircleOutline(node.Position, node.Radius, Theme.NormalNodeOutlineColor * (alpha * 0.72f), 3f);
         DrawNodeLabel(node.Label, node.Position, editing: false, Theme.NodeLabelTextColor * (alpha * 0.78f));
@@ -136,8 +137,8 @@ public sealed class NodeRenderer
     public void DrawNodeResizeHandle(DiagramNode node)
     {
         var center = GetNodeResizeHandleCenter(node);
-        _primitiveRenderer.DrawLine(node.Position + new Vector2(node.Radius * 0.72f, node.Radius * 0.72f), center, new Color(255, 230, 120), 2f);
-        _primitiveRenderer.DrawHandle(center, new Color(255, 230, 120));
+        _primitiveRenderer.DrawLine(node.Position + new Vector2(node.Radius * 0.72f, node.Radius * 0.72f), center, Theme.NodeResizeHandleColor, 2f);
+        _primitiveRenderer.DrawHandle(center, Theme.NodeResizeHandleColor, Theme.HandleOutlineColor);
     }
     private void DrawNodeOutlineCircle(Vector2 center, float radius, Color color, float thickness, bool hovered, TimeSpan totalGameTime, float amplitude = 2.1f)
     {
@@ -175,8 +176,8 @@ public sealed class NodeRenderer
     private void DrawSelectedNodeGlow(DiagramNode node, TimeSpan totalGameTime)
     {
         var pulse = 0.5f + (MathF.Sin((float)totalGameTime.TotalSeconds * 4.4f) * 0.5f);
-        _primitiveRenderer.DrawCircle(node.Position, node.Radius + 10f, new Color(255, 236, 145) * MathHelper.Lerp(0.12f, 0.22f, pulse));
-        _primitiveRenderer.DrawCircle(node.Position, node.Radius + 6f, new Color(255, 255, 255) * MathHelper.Lerp(0.18f, 0.28f, pulse));
+        _primitiveRenderer.DrawCircle(node.Position, node.Radius + 10f, Theme.NodeSelectedGlowColor * MathHelper.Lerp(0.12f, 0.22f, pulse));
+        _primitiveRenderer.DrawCircle(node.Position, node.Radius + 6f, Theme.NodeSelectedInnerGlowColor * MathHelper.Lerp(0.18f, 0.28f, pulse));
     }
 
     private void DrawSelectedNodeSweep(DiagramNode node, TimeSpan totalGameTime)
@@ -201,7 +202,7 @@ public sealed class NodeRenderer
                 (int)(node.Position.Y + y),
                 (int)(halfWidth * 2),
                 1);
-            _primitiveRenderer.DrawPixelRectangle(rectangle, new Color(255, 255, 255) * alpha);
+            _primitiveRenderer.DrawPixelRectangle(rectangle, Theme.NodeSelectedSweepColor * alpha);
         }
     }
 
@@ -218,7 +219,22 @@ public sealed class NodeRenderer
     {
         var texture = _getLabelTexture(label, editing);
         var position = center - new Vector2(texture.Width / 2f, texture.Height / 2f);
+        if (editing)
+        {
+            DrawLabelEditorBackground(position, texture);
+        }
+
         _spriteBatch.Draw(texture, position, color);
+    }
+
+    private void DrawLabelEditorBackground(Vector2 position, Texture2D texture)
+    {
+        var bounds = new Rectangle((int)position.X, (int)position.Y, texture.Width, texture.Height);
+        _primitiveRenderer.DrawPixelRectangle(bounds, Theme.LabelEditorBackgroundColor);
+        _primitiveRenderer.DrawLine(new Vector2(bounds.Left, bounds.Top), new Vector2(bounds.Right, bounds.Top), Theme.LabelEditorBorderColor, 2f);
+        _primitiveRenderer.DrawLine(new Vector2(bounds.Right, bounds.Top), new Vector2(bounds.Right, bounds.Bottom), Theme.LabelEditorBorderColor, 2f);
+        _primitiveRenderer.DrawLine(new Vector2(bounds.Right, bounds.Bottom), new Vector2(bounds.Left, bounds.Bottom), Theme.LabelEditorBorderColor, 2f);
+        _primitiveRenderer.DrawLine(new Vector2(bounds.Left, bounds.Bottom), new Vector2(bounds.Left, bounds.Top), Theme.LabelEditorBorderColor, 2f);
     }
 
     private void DrawEditingCaret(string label, int caretIndex, Vector2 center, Color color)

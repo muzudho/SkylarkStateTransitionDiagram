@@ -24,9 +24,12 @@ public sealed class PrimitiveRenderer
     /// <param name="center">取っ手の中心点</param>
     /// <param name="color">取っ手の色</param>
     public void DrawHandle(Vector2 center, Color color)
+        => DrawHandle(center, color, new Color(20, 24, 30));
+
+    public void DrawHandle(Vector2 center, Color color, Color outlineColor)
     {
         DrawCircle(center, 8f, color);
-        DrawCircleOutline(center, 8f, new Color(20, 24, 30), 2f);
+        DrawCircleOutline(center, 8f, outlineColor, 2f);
     }
 
     /// <summary>
