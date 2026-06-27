@@ -19,6 +19,9 @@ public static class KeyCapThemes
     public static IKeyCapTheme Mint { get; } = new MintKeyCapTheme();
     public static IKeyCapTheme Amber { get; } = new AmberKeyCapTheme();
     public static IKeyCapTheme Midnight { get; } = new MidnightKeyCapTheme();
+    public static IKeyCapTheme PastelColors { get; } = new PastelColorsKeyCapTheme();
+    public static IKeyCapTheme Beach { get; } = new BeachKeyCapTheme();
+    public static IKeyCapTheme Roma { get; } = new RomaKeyCapTheme();
 
     public static IReadOnlyList<IKeyCapTheme> AllThemes { get; } =
     [
@@ -34,7 +37,10 @@ public static class KeyCapThemes
         Monochrome,
         Mint,
         Amber,
-        Midnight
+        Midnight,
+        PastelColors,
+        Beach,
+        Roma
     ];
 
     public static IReadOnlyList<IKeyCapTheme> ShortcutThemes { get; } =
@@ -49,7 +55,11 @@ public static class KeyCapThemes
         Monochrome,
         Mint,
         Amber,
-        Midnight
+        Midnight,
+        PastelColors,
+        Beach,
+        Roma
     ];
 }
+
 
