@@ -7,6 +7,7 @@ public static class KeyCapThemes
     public static IKeyCapTheme Current => YukaiLark;
 
     public static IKeyCapTheme YukaiLark { get; } = new YukaiLarkKeyCapTheme();
+    public static IKeyCapTheme Kifuwarabe { get; } = new KifuwarabeKeyCapTheme();
     public static IKeyCapTheme Office { get; } = new OfficeKeyCapTheme();
     public static IKeyCapTheme Gaming { get; } = new GamingKeyCapTheme();
     public static IKeyCapTheme Retro { get; } = new RetroKeyCapTheme();
@@ -22,6 +23,7 @@ public static class KeyCapThemes
     public static IReadOnlyList<IKeyCapTheme> AllThemes { get; } =
     [
         YukaiLark,
+        Kifuwarabe,
         Office,
         Gaming,
         Retro,
@@ -38,6 +40,7 @@ public static class KeyCapThemes
     public static IReadOnlyList<IKeyCapTheme> ShortcutThemes { get; } =
     [
         YukaiLark,
+        Kifuwarabe,
         Gaming,
         Retro,
         CopyPaper,
@@ -49,3 +52,4 @@ public static class KeyCapThemes
         Midnight
     ];
 }
+
