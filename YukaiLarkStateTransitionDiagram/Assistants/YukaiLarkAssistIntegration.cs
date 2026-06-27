@@ -302,14 +302,15 @@ public partial class Game1
 
     private void DrawYukaiLarkMascot(Viewport viewport, TimeSpan totalGameTime)
     {
-        if (_yukaiLarkMascotTexture is null)
+        var mascotTexture = GetYukaiLarkMascotTexture();
+        if (mascotTexture is null)
         {
             return;
         }
 
         _yukaiLarkAssistant.Draw(
             _spriteBatch,
-            _yukaiLarkMascotTexture,
+            mascotTexture,
             _pixel,
             viewport,
             totalGameTime,

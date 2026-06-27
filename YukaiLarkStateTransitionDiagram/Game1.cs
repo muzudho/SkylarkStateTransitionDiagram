@@ -24,7 +24,8 @@ public partial class Game1 : Game
     private const int MaxFileNameLength = 255;
     private const float MinCameraZoom = 0.25f;
     private const float MaxCameraZoom = 3.0f;
-    private const string YukaiLarkMascotTexturePath = "Assets/BrandLogo/yukai-lark-logo.png";
+    private const string YukaiLarkMascotLightThemeTexturePath = "Assets/BrandLogo/yukai-lark-logo-light-theme.png";
+    private const string YukaiLarkMascotDarkThemeTexturePath = "Assets/BrandLogo/yukai-lark-logo-dark-theme.png";
     private readonly GraphicsDeviceManager _graphics;
     private readonly List<DiagramNode> _nodes = new();
     private readonly List<DiagramTransition> _transitions = new();
@@ -40,7 +41,8 @@ public partial class Game1 : Game
     private ShortcutKeyRenderer _shortcutKeyRenderer = null!;
     private SpriteBatch _spriteBatch = null!;
     private Texture2D _pixel = null!;
-    private Texture2D? _yukaiLarkMascotTexture;
+    private Texture2D? _yukaiLarkMascotLightThemeTexture;
+    private Texture2D? _yukaiLarkMascotDarkThemeTexture;
     private readonly YukaiLarkAssistant _yukaiLarkAssistant = new();
     private readonly TextBoxController _textBoxController = new(24);
     private readonly TextBoxController _fileNameTextBoxController = new(MaxFileNameLength);
@@ -95,7 +97,8 @@ public partial class Game1 : Game
         _miniMapRenderer = new MiniMapRenderer(_spriteBatch, _pixel, _primitiveRenderer);
         _shortcutKeyRenderer = new ShortcutKeyRenderer(GraphicsDevice, _spriteBatch, _pixel, _keyCapTheme, _boardTheme);
         _nodeRenderer = new NodeRenderer(_primitiveRenderer, _spriteBatch, Palette, GetLabelTexture, _boardTheme);
-        _yukaiLarkMascotTexture = LoadTextureWithTransparentWhite(YukaiLarkMascotTexturePath);
+        _yukaiLarkMascotLightThemeTexture = LoadTextureWithTransparentWhite(YukaiLarkMascotLightThemeTexturePath);
+        _yukaiLarkMascotDarkThemeTexture = LoadTextureWithTransparentWhite(YukaiLarkMascotDarkThemeTexturePath);
     }
     protected override void Update(GameTime gameTime)
     {
@@ -212,8 +215,10 @@ public partial class Game1 : Game
             texture.Dispose();
         }
         _uiTextTextureCache.Clear();
-        _yukaiLarkMascotTexture?.Dispose();
-        _yukaiLarkMascotTexture = null;
+        _yukaiLarkMascotLightThemeTexture?.Dispose();
+        _yukaiLarkMascotDarkThemeTexture?.Dispose();
+        _yukaiLarkMascotLightThemeTexture = null;
+        _yukaiLarkMascotDarkThemeTexture = null;
         _headerRenderer?.Dispose();
         _inspectorPanelRenderer?.Dispose();
         _shortcutKeyRenderer?.Dispose();
@@ -428,6 +433,17 @@ public partial class Game1 : Game
     }
     private static Color WithAlpha(Color color, byte alpha)
         => new(color.R, color.G, color.B, alpha);
+
+    private Texture2D? GetYukaiLarkMascotTexture()
+        => IsLightBoardTheme()
+            ? _yukaiLarkMascotLightThemeTexture ?? _yukaiLarkMascotDarkThemeTexture
+            : _yukaiLarkMascotDarkThemeTexture ?? _yukaiLarkMascotLightThemeTexture;
+
+    private bool IsLightBoardTheme()
+        => GetLuminance(_boardTheme.BackgroundColor) >= 0.58f;
+
+    private static float GetLuminance(Color color)
+        => ((0.2126f * color.R) + (0.7152f * color.G) + (0.0722f * color.B)) / 255f;
 
     private static Color Blend(Color from, Color to, float amount)
     {

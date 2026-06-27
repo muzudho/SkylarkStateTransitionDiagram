@@ -159,11 +159,12 @@ public partial class Game1
         _spriteBatch.Draw(_pixel, panel, WithAlpha(_boardTheme.PanelBackgroundColor, 246));
         DrawScreenRectangleOutline(panel, WithAlpha(_boardTheme.PanelTopEdgeColor, 235), 2);
 
-        if (_yukaiLarkMascotTexture is not null)
+        var mascotTexture = GetYukaiLarkMascotTexture();
+        if (mascotTexture is not null)
         {
             var mascotSize = 88;
             var mascot = new Rectangle(panel.X + 24, panel.Y + 24, mascotSize, mascotSize);
-            _spriteBatch.Draw(_yukaiLarkMascotTexture, mascot, Color.White);
+            _spriteBatch.Draw(mascotTexture, mascot, Color.White);
         }
 
         var textX = panel.X + 130;
