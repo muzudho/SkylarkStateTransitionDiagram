@@ -16,8 +16,24 @@ public sealed record BoardTheme(
     Color SelectedTransitionLabelColor,
     Color TransitionHandleColor,
     Color TransitionControlHandleColor,
-    Color TransitionGuideColor)
+    Color TransitionGuideColor,
+    Color[]? NormalNodePaletteOverride = null)
 {
+    public const int NormalNodePaletteLength = 6;
+
+    public Color[] NormalNodePalette { get; } = NormalizeNormalNodePalette(
+        NormalNodePaletteOverride,
+        CreateNormalNodePalette(
+            BackgroundColor,
+            PhotoPaperColor,
+            PhotoEdgeColor,
+            PinColor,
+            TransitionLineColor,
+            TransitionLabelColor,
+            SelectedTransitionLineColor,
+            TransitionControlHandleColor,
+            GridColor));
+
     private bool IsLightBackground => GetLuminance(BackgroundColor) >= 0.58f;
 
     public Color HeaderBackgroundColor => IsLightBackground
@@ -53,9 +69,8 @@ public sealed record BoardTheme(
     public Color NormalNodeOutlineColor => IsLightBackground
         ? WithAlpha(Blend(TransitionLabelColor, BackgroundColor, 0.04f), 245)
         : WithAlpha(Blend(TransitionLineColor, PhotoPaperColor, 0.18f), 238);
-    public Color MarkerFillColor => IsLightBackground
-        ? Blend(BackgroundColor, Color.Black, 0.82f)
-        : Blend(BackgroundColor, Color.Black, 0.38f);
+    public Color StartMarkerFillColor => ToneMarkerColor(PinColor);
+    public Color EndMarkerFillColor => ToneMarkerColor(SelectedTransitionLineColor);
     public Color MarkerOutlineColor => IsLightBackground
         ? WithAlpha(TransitionLineColor, 245)
         : WithAlpha(PhotoPaperColor, 245);
@@ -106,6 +121,61 @@ public sealed record BoardTheme(
     private static Color WithAlpha(Color color, byte alpha)
         => new(color.R, color.G, color.B, alpha);
 
+    private static Color[] NormalizeNormalNodePalette(Color[]? overridePalette, Color[] generatedPalette)
+    {
+        if (overridePalette is { Length: NormalNodePaletteLength })
+        {
+            return overridePalette;
+        }
+
+        return generatedPalette;
+    }
+    private static Color[] CreateNormalNodePalette(
+        Color backgroundColor,
+        Color photoPaperColor,
+        Color photoEdgeColor,
+        Color pinColor,
+        Color transitionLineColor,
+        Color transitionLabelColor,
+        Color selectedTransitionLineColor,
+        Color transitionControlHandleColor,
+        Color gridColor)
+    {
+        var isLightBackground = GetLuminance(backgroundColor) >= 0.58f;
+        return new[]
+        {
+            ToneNormalNodeColor(transitionLineColor, backgroundColor, photoPaperColor, isLightBackground),
+            ToneNormalNodeColor(transitionControlHandleColor, backgroundColor, photoPaperColor, isLightBackground),
+            ToneNormalNodeColor(photoEdgeColor, backgroundColor, photoPaperColor, isLightBackground),
+            ToneNormalNodeColor(gridColor, backgroundColor, photoPaperColor, isLightBackground),
+            ToneNormalNodeColor(Blend(pinColor, transitionLabelColor, 0.34f), backgroundColor, photoPaperColor, isLightBackground),
+            ToneNormalNodeColor(Blend(selectedTransitionLineColor, transitionLabelColor, 0.46f), backgroundColor, photoPaperColor, isLightBackground)
+        };
+    }
+
+    private Color ToneMarkerColor(Color color)
+        => IsLightBackground
+            ? WithAlpha(Blend(color, Color.Black, 0.48f), 248)
+            : WithAlpha(Blend(color, PhotoPaperColor, 0.18f), 248);
+
+    private static Color ToneNormalNodeColor(Color color, Color backgroundColor, Color photoPaperColor, bool isLightBackground)
+    {
+        var toned = isLightBackground
+            ? Blend(color, Color.Black, 0.30f)
+            : Blend(color, photoPaperColor, 0.12f);
+
+        var luminance = GetLuminance(toned);
+        if (isLightBackground && luminance > 0.48f)
+        {
+            toned = Blend(toned, Color.Black, 0.24f);
+        }
+        else if (!isLightBackground && luminance < 0.36f)
+        {
+            toned = Blend(toned, photoPaperColor, 0.24f);
+        }
+
+        return WithAlpha(toned, 255);
+    }
     private static Color Blend(Color from, Color to, float amount)
     {
         var clamped = MathHelper.Clamp(amount, 0f, 1f);

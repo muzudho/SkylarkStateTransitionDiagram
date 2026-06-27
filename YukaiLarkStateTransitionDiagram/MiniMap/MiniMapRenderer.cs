@@ -60,9 +60,9 @@ public sealed class MiniMapRenderer
         var radius = Math.Clamp(node.Radius / Math.Max(1f, layout.WorldBounds.Width) * layout.MapBounds.Width, 3.5f, 8f);
         var fill = node.Kind switch
         {
-            NodeKind.StartMarker => theme.PinColor,
-            NodeKind.EndMarker => theme.SelectedTransitionLineColor,
-            _ => theme.TransitionHandleColor
+            NodeKind.StartMarker => theme.StartMarkerFillColor,
+            NodeKind.EndMarker => theme.EndMarkerFillColor,
+            _ => theme.NormalNodePalette[node.ColorIndex % theme.NormalNodePalette.Length]
         };
         if (dimmed)
         {

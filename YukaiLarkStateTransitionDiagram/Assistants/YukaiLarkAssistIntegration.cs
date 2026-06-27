@@ -136,7 +136,7 @@ public partial class Game1
             Nodes = _nodes,
             Transitions = _transitions,
             NextNodeId = _nextNodeId,
-            PaletteLength = Palette.Length,
+            PaletteLength = _boardTheme.NormalNodePalette.Length,
             ScreenToWorld = ScreenToWorld,
             SnapToHalfGrid = SnapToHalfGrid,
             ExecuteUndoableChange = ExecuteUndoableChange,

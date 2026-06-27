@@ -96,7 +96,7 @@ public partial class Game1 : Game
         _inspectorPanelRenderer = new InspectorPanelRenderer(GraphicsDevice, _spriteBatch, _pixel, _primitiveRenderer);
         _miniMapRenderer = new MiniMapRenderer(_spriteBatch, _pixel, _primitiveRenderer);
         _shortcutKeyRenderer = new ShortcutKeyRenderer(GraphicsDevice, _spriteBatch, _pixel, _keyCapTheme, _boardTheme);
-        _nodeRenderer = new NodeRenderer(_primitiveRenderer, _spriteBatch, Palette, GetLabelTexture, _boardTheme);
+        _nodeRenderer = new NodeRenderer(_primitiveRenderer, _spriteBatch, GetLabelTexture, _boardTheme);
         _yukaiLarkMascotLightThemeTexture = LoadTextureWithTransparentWhite(YukaiLarkMascotLightThemeTexturePath);
         _yukaiLarkMascotDarkThemeTexture = LoadTextureWithTransparentWhite(YukaiLarkMascotDarkThemeTexturePath);
     }
@@ -454,15 +454,6 @@ public partial class Game1 : Game
             (byte)MathF.Round(MathHelper.Lerp(from.B, to.B, clamped)),
             (byte)MathF.Round(MathHelper.Lerp(from.A, to.A, clamped)));
     }
-    private static readonly Color[] Palette =
-    {
-        new(60, 130, 220),
-        new(40, 165, 120),
-        new(205, 90, 95),
-        new(180, 130, 55),
-        new(130, 105, 200),
-        new(55, 150, 170)
-    };
 }
 public sealed class DiagramDocument
 {

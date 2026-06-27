@@ -17,7 +17,7 @@ public partial class Game1
                 Label = $"状態{_nextNodeId - 1}",
                 Position = SnapToHalfGrid(position),
                 RadiusUnits = DiagramNode.DefaultRadiusUnits,
-                ColorIndex = (_nextNodeId - 2) % Palette.Length
+                ColorIndex = (_nextNodeId - 2) % _boardTheme.NormalNodePalette.Length
             };
             _nodes.Add(node);
             _selectedNode = node;

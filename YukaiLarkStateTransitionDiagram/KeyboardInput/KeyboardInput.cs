@@ -149,13 +149,13 @@ public partial class Game1
             {
                 ExecuteUndoableChange(() =>
                 {
-                    _selectedNode.ColorIndex = (_selectedNode.ColorIndex + 1) % Palette.Length;
+                    _selectedNode.ColorIndex = (_selectedNode.ColorIndex + 1) % _boardTheme.NormalNodePalette.Length;
                 });
                 _status = "選択中の状態色を切り替えました。";
             }
             else
             {
-                _status = "開始・終了マークは黒固定です。状態の色は通常ノードで変更できます。";
+                _status = "開始・終了マークの色はテーマに合わせて表示されます。状態の色は通常ノードで変更できます。";
             }
         }
     }

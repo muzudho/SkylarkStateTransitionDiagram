@@ -287,7 +287,7 @@ public partial class Game1
             Label = $"状態{nodeId}",
             Position = worldPosition + new Vector2(0f, bob),
             RadiusUnits = DiagramNode.DefaultRadiusUnits,
-            ColorIndex = (nodeId - 1) % Palette.Length,
+            ColorIndex = (nodeId - 1) % _boardTheme.NormalNodePalette.Length,
             Kind = NodeKind.Normal
         };
         _nodeRenderer.DrawStateNodeGhost(ghostNode, 1f);

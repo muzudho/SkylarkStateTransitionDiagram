@@ -12,7 +12,6 @@ public sealed class NodeRenderer
 {
     private readonly PrimitiveRenderer _primitiveRenderer;
     private readonly SpriteBatch _spriteBatch;
-    private readonly Color[] _palette;
     private readonly Func<string, bool, Texture2D> _getLabelTexture;
 
     public BoardTheme Theme { get; set; }
@@ -20,13 +19,11 @@ public sealed class NodeRenderer
     public NodeRenderer(
         PrimitiveRenderer primitiveRenderer,
         SpriteBatch spriteBatch,
-        Color[] palette,
         Func<string, bool, Texture2D> getLabelTexture,
         BoardTheme theme)
     {
         _primitiveRenderer = primitiveRenderer;
         _spriteBatch = spriteBatch;
-        _palette = palette;
         _getLabelTexture = getLabelTexture;
         Theme = theme;
     }
@@ -40,16 +37,19 @@ public sealed class NodeRenderer
     /// <param name="editingLabel">編集中のラベル</param>
     public void DrawNode(DiagramNode node, bool selected, DiagramNode? editingNode, string editingLabel, int editingCaretIndex, bool showEditingCaret, TimeSpan totalGameTime, bool inactive = false, bool hovered = false)
     {
-        var baseFill = node.Kind == NodeKind.Normal && _palette.Length > 0
-            ? _palette[node.ColorIndex % _palette.Length]
-            : Theme.MarkerFillColor;
+        var baseFill = node.Kind switch
+        {
+            NodeKind.Normal => GetNormalNodeFillColor(node),
+            NodeKind.StartMarker => Theme.StartMarkerFillColor,
+            _ => Theme.EndMarkerFillColor
+        };
         var fill = inactive ? GetInactiveColor(baseFill, 0.38f) : baseFill;
         var outerColor = inactive
             ? GetInactiveColor(selected ? Theme.SelectedNodeOuterRingColor : Theme.NodeOuterRingColor, 0.52f)
             : selected ? Theme.SelectedNodeOuterRingColor : Theme.NodeOuterRingColor;
         var outlineColor = inactive ? GetInactiveColor(Theme.MarkerOutlineColor, 0.56f) : Theme.MarkerOutlineColor;
         var normalOutlineColor = inactive ? GetInactiveColor(Theme.NormalNodeOutlineColor, 0.56f) : Theme.NormalNodeOutlineColor;
-        var labelColor = inactive ? Theme.PanelMutedTextColor * 0.72f : Theme.NodeLabelTextColor;
+        var labelColor = GetNodeLabelColor(baseFill, inactive);
 
         if (selected && !inactive)
         {
@@ -106,9 +106,9 @@ public sealed class NodeRenderer
         var alpha = MathHelper.Clamp(opacity, 0f, 1f);
         _primitiveRenderer.DrawCircle(node.Position, node.Radius + 8f, Theme.NodeGhostHaloColor * (alpha * 0.32f));
         _primitiveRenderer.DrawCircle(node.Position, node.Radius + 4f, Theme.NodeGhostInnerHaloColor * (alpha * 0.34f));
-        _primitiveRenderer.DrawCircle(node.Position, node.Radius, Theme.MarkerFillColor * (alpha * 0.46f));
+        _primitiveRenderer.DrawCircle(node.Position, node.Radius, Theme.StartMarkerFillColor * (alpha * 0.46f));
         _primitiveRenderer.DrawCircleOutline(node.Position, node.Radius - 1f, Theme.MarkerOutlineColor * (alpha * 0.74f), 5f);
-        DrawNodeLabel(node.Label, node.Position, editing: false, Theme.NodeLabelTextColor * (alpha * 0.74f));
+        DrawNodeLabel(node.Label, node.Position, editing: false, GetNodeLabelColor(Theme.StartMarkerFillColor, inactive: false) * (alpha * 0.74f));
     }
 
     /// <summary>
@@ -119,15 +119,13 @@ public sealed class NodeRenderer
     public void DrawStateNodeGhost(DiagramNode node, float opacity)
     {
         var alpha = MathHelper.Clamp(opacity, 0f, 1f);
-        var fill = _palette.Length > 0
-            ? _palette[node.ColorIndex % _palette.Length]
-            : Theme.SelectedTransitionLineColor;
+        var fill = GetNormalNodeFillColor(node);
 
         _primitiveRenderer.DrawCircle(node.Position, node.Radius + 8f, fill * (alpha * 0.26f));
         _primitiveRenderer.DrawCircle(node.Position, node.Radius + 4f, Theme.NodeGhostInnerHaloColor * (alpha * 0.3f));
         _primitiveRenderer.DrawCircle(node.Position, node.Radius, fill * (alpha * 0.54f));
         _primitiveRenderer.DrawCircleOutline(node.Position, node.Radius, Theme.NormalNodeOutlineColor * (alpha * 0.72f), 3f);
-        DrawNodeLabel(node.Label, node.Position, editing: false, Theme.NodeLabelTextColor * (alpha * 0.78f));
+        DrawNodeLabel(node.Label, node.Position, editing: false, GetNodeLabelColor(fill, inactive: false) * (alpha * 0.78f));
     }
 
     /// <summary>
@@ -253,6 +251,37 @@ public sealed class NodeRenderer
         _primitiveRenderer.DrawLine(new Vector2(x, top), new Vector2(x, bottom), color, 2f);
     }
 
+
+    private Color GetNormalNodeFillColor(DiagramNode node)
+    {
+        var palette = Theme.NormalNodePalette;
+        return palette[node.ColorIndex % palette.Length];
+    }
+    private Color GetNodeLabelColor(Color fill, bool inactive)
+    {
+        if (inactive)
+        {
+            return Theme.PanelMutedTextColor * 0.72f;
+        }
+
+        return GetReadableTextColor(fill);
+    }
+
+    private Color GetReadableTextColor(Color fill)
+    {
+        if (GetLuminance(fill) >= 0.50f)
+        {
+            return WithAlpha(Blend(Theme.TransitionLabelColor, Color.Black, 0.22f), 248);
+        }
+
+        return WithAlpha(Theme.PhotoPaperColor, 248);
+    }
+
+    private static float GetLuminance(Color color)
+        => ((0.2126f * color.R) + (0.7152f * color.G) + (0.0722f * color.B)) / 255f;
+
+    private static Color WithAlpha(Color color, byte alpha)
+        => new(color.R, color.G, color.B, alpha);
     private Color GetInactiveColor(Color color, float opacity)
         => Blend(color, Theme.BackgroundColor, 0.62f) * opacity;
 
