@@ -51,9 +51,86 @@ public partial class Game1
                     UpdateTransitionWaypointEndpointAngles(transition);
                 }
                 break;
+            case TransitionHandleKind.SegmentControlPoint1:
+                SetTransitionSegmentControlPoint(transition, waypointIndex, isFirstControlPoint: true, mousePosition);
+                break;
+            case TransitionHandleKind.SegmentControlPoint2:
+                SetTransitionSegmentControlPoint(transition, waypointIndex, isFirstControlPoint: false, mousePosition);
+                break;
         }
     }
 
+
+
+    private void SetTransitionSegmentControlPoint(DiagramTransition transition, int segmentIndex, bool isFirstControlPoint, Vector2 position)
+    {
+        if (segmentIndex < 0 || !TryGetTransitionPath(transition, out var points) || segmentIndex >= points.Count - 1)
+        {
+            return;
+        }
+
+        EnsureTransitionSegmentControls(transition, segmentIndex + 1);
+        if (isFirstControlPoint)
+        {
+            transition.SegmentControls[segmentIndex].ControlPoint1 = position;
+            AlignPreviousSegmentControlPointAngle(transition, points, segmentIndex, position);
+        }
+        else
+        {
+            transition.SegmentControls[segmentIndex].ControlPoint2 = position;
+            AlignNextSegmentControlPointAngle(transition, points, segmentIndex, position);
+        }
+    }
+
+    private static void AlignPreviousSegmentControlPointAngle(DiagramTransition transition, IReadOnlyList<Vector2> points, int segmentIndex, Vector2 movedControlPoint)
+    {
+        if (segmentIndex <= 0)
+        {
+            return;
+        }
+
+        var joint = points[segmentIndex];
+        var direction = movedControlPoint - joint;
+        if (direction.LengthSquared() <= 0.01f)
+        {
+            return;
+        }
+
+        var oppositeSegmentIndex = segmentIndex - 1;
+        EnsureTransitionSegmentControls(transition, oppositeSegmentIndex + 1);
+        GetTransitionPathSegmentControlPoints(points, oppositeSegmentIndex, transition.SegmentControls, out _, out var currentOppositeControlPoint);
+        var length = Vector2.Distance(joint, currentOppositeControlPoint);
+        transition.SegmentControls[oppositeSegmentIndex].ControlPoint2 = joint - Vector2.Normalize(direction) * length;
+    }
+
+    private static void AlignNextSegmentControlPointAngle(DiagramTransition transition, IReadOnlyList<Vector2> points, int segmentIndex, Vector2 movedControlPoint)
+    {
+        if (segmentIndex + 1 >= points.Count - 1)
+        {
+            return;
+        }
+
+        var joint = points[segmentIndex + 1];
+        var direction = movedControlPoint - joint;
+        if (direction.LengthSquared() <= 0.01f)
+        {
+            return;
+        }
+
+        var oppositeSegmentIndex = segmentIndex + 1;
+        EnsureTransitionSegmentControls(transition, oppositeSegmentIndex + 1);
+        GetTransitionPathSegmentControlPoints(points, oppositeSegmentIndex, transition.SegmentControls, out var currentOppositeControlPoint, out _);
+        var length = Vector2.Distance(joint, currentOppositeControlPoint);
+        transition.SegmentControls[oppositeSegmentIndex].ControlPoint1 = joint - Vector2.Normalize(direction) * length;
+    }
+
+    private static void EnsureTransitionSegmentControls(DiagramTransition transition, int count)
+    {
+        while (transition.SegmentControls.Count < count)
+        {
+            transition.SegmentControls.Add(new TransitionSegmentControls());
+        }
+    }
 
     private void UpdateTransitionWaypointEndpointAngles(DiagramTransition transition)
     {
@@ -170,7 +247,7 @@ public partial class Game1
         return true;
     }
 
-    private static Vector2 GetTransitionPathPoint(IReadOnlyList<Vector2> points, float t)
+    private static Vector2 GetTransitionPathPoint(IReadOnlyList<Vector2> points, float t, IReadOnlyList<TransitionSegmentControls>? segmentControls = null)
     {
         if (points.Count == 0)
         {
@@ -181,7 +258,7 @@ public partial class Game1
             return points[0];
         }
 
-        var totalLength = GetTransitionPathLength(points);
+        var totalLength = GetTransitionPathLength(points, segmentControls);
         if (totalLength <= 0f)
         {
             return points[0];
@@ -191,7 +268,7 @@ public partial class Game1
         var walked = 0f;
         for (var i = 0; i < points.Count - 1; i++)
         {
-            GetTransitionPathSegmentControlPoints(points, i, out var control1, out var control2);
+            GetTransitionPathSegmentControlPoints(points, i, segmentControls, out var control1, out var control2);
             var segmentLength = GetCubicBezierLength(points[i], control1, control2, points[i + 1]);
             if (walked + segmentLength >= targetLength)
             {
@@ -204,14 +281,14 @@ public partial class Game1
         return points[^1];
     }
 
-    private static Vector2 GetTransitionPathTangent(IReadOnlyList<Vector2> points, float t)
+    private static Vector2 GetTransitionPathTangent(IReadOnlyList<Vector2> points, float t, IReadOnlyList<TransitionSegmentControls>? segmentControls = null)
     {
         if (points.Count < 2)
         {
             return Vector2.UnitX;
         }
 
-        var totalLength = GetTransitionPathLength(points);
+        var totalLength = GetTransitionPathLength(points, segmentControls);
         if (totalLength <= 0f)
         {
             return points[^1] - points[0];
@@ -221,7 +298,7 @@ public partial class Game1
         var walked = 0f;
         for (var i = 0; i < points.Count - 1; i++)
         {
-            GetTransitionPathSegmentControlPoints(points, i, out var control1, out var control2);
+            GetTransitionPathSegmentControlPoints(points, i, segmentControls, out var control1, out var control2);
             var segmentLength = GetCubicBezierLength(points[i], control1, control2, points[i + 1]);
             if (walked + segmentLength >= targetLength)
             {
@@ -231,24 +308,24 @@ public partial class Game1
             walked += segmentLength;
         }
 
-        GetTransitionPathSegmentControlPoints(points, points.Count - 2, out var lastControl1, out var lastControl2);
+        GetTransitionPathSegmentControlPoints(points, points.Count - 2, segmentControls, out var lastControl1, out var lastControl2);
         return CubicBezierTangent(points[^2], lastControl1, lastControl2, points[^1], 1f);
     }
 
-    private static float GetTransitionPathLength(IReadOnlyList<Vector2> points)
+    private static float GetTransitionPathLength(IReadOnlyList<Vector2> points, IReadOnlyList<TransitionSegmentControls>? segmentControls = null)
     {
         var length = 0f;
         for (var i = 0; i < points.Count - 1; i++)
         {
-            GetTransitionPathSegmentControlPoints(points, i, out var control1, out var control2);
+            GetTransitionPathSegmentControlPoints(points, i, segmentControls, out var control1, out var control2);
             length += GetCubicBezierLength(points[i], control1, control2, points[i + 1]);
         }
         return length;
     }
 
-    private static float FindNearestTransitionPathT(Vector2 point, IReadOnlyList<Vector2> points)
+    private static float FindNearestTransitionPathT(Vector2 point, IReadOnlyList<Vector2> points, IReadOnlyList<TransitionSegmentControls>? segmentControls = null)
     {
-        var totalLength = GetTransitionPathLength(points);
+        var totalLength = GetTransitionPathLength(points, segmentControls);
         if (totalLength <= 0f)
         {
             return 0f;
@@ -260,7 +337,7 @@ public partial class Game1
         var bestDistance = float.MaxValue;
         for (var i = 0; i < points.Count - 1; i++)
         {
-            GetTransitionPathSegmentControlPoints(points, i, out var control1, out var control2);
+            GetTransitionPathSegmentControlPoints(points, i, segmentControls, out var control1, out var control2);
             var previous = points[i];
             var segmentWalked = 0f;
             for (var sample = 1; sample <= samplesPerSegment; sample++)
@@ -283,26 +360,31 @@ public partial class Game1
         return MathHelper.Clamp(bestT, 0f, 1f);
     }
 
-    private static float DistanceToTransitionPath(Vector2 point, IReadOnlyList<Vector2> points)
+    private static float DistanceToTransitionPath(Vector2 point, IReadOnlyList<Vector2> points, IReadOnlyList<TransitionSegmentControls>? segmentControls = null)
     {
         var best = float.MaxValue;
         for (var i = 0; i < points.Count - 1; i++)
         {
-            GetTransitionPathSegmentControlPoints(points, i, out var control1, out var control2);
+            GetTransitionPathSegmentControlPoints(points, i, segmentControls, out var control1, out var control2);
             best = MathF.Min(best, DistanceToBezier(point, points[i], control1, control2, points[i + 1]));
         }
         return best;
     }
 
-    private static void GetTransitionPathSegmentControlPoints(IReadOnlyList<Vector2> points, int segmentIndex, out Vector2 control1, out Vector2 control2)
+    private static void GetTransitionPathSegmentControlPoints(IReadOnlyList<Vector2> points, int segmentIndex, IReadOnlyList<TransitionSegmentControls>? segmentControls, out Vector2 control1, out Vector2 control2)
     {
         var start = points[segmentIndex];
         var end = points[segmentIndex + 1];
         var previous = segmentIndex > 0 ? points[segmentIndex - 1] : start;
         var next = segmentIndex + 2 < points.Count ? points[segmentIndex + 2] : end;
         const float smoothness = 1f / 6f;
-        control1 = start + (end - previous) * smoothness;
-        control2 = end - (next - start) * smoothness;
+        var automaticControl1 = start + (end - previous) * smoothness;
+        var automaticControl2 = end - (next - start) * smoothness;
+        var customControls = segmentControls is not null && segmentIndex < segmentControls.Count
+            ? segmentControls[segmentIndex]
+            : null;
+        control1 = customControls?.ControlPoint1 ?? automaticControl1;
+        control2 = customControls?.ControlPoint2 ?? automaticControl2;
     }
 
     private static float GetCubicBezierLength(Vector2 start, Vector2 control1, Vector2 control2, Vector2 end)

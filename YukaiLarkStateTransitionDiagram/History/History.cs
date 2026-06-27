@@ -189,7 +189,16 @@ public partial class Game1
             TargetAngle = transition.TargetAngle,
             ControlPoint1 = transition.ControlPoint1,
             ControlPoint2 = transition.ControlPoint2,
-            Waypoints = transition.Waypoints.ToList()
+            Waypoints = transition.Waypoints.ToList(),
+            SegmentControls = transition.SegmentControls.Select(CloneTransitionSegmentControls).ToList()
+        };
+
+
+    private static TransitionSegmentControls CloneTransitionSegmentControls(TransitionSegmentControls controls)
+        => new()
+        {
+            ControlPoint1 = controls.ControlPoint1,
+            ControlPoint2 = controls.ControlPoint2
         };
 
     private static AssistSuggestionSuppression CloneAssistSuggestionSuppression(AssistSuggestionSuppression suppression)

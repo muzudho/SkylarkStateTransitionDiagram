@@ -532,6 +532,12 @@ public sealed class DiagramTransition
     public Vector2? ControlPoint1 { get; set; }
     public Vector2? ControlPoint2 { get; set; }
     public List<Vector2> Waypoints { get; set; } = new();
+    public List<TransitionSegmentControls> SegmentControls { get; set; } = new();
+}
+public sealed class TransitionSegmentControls
+{
+    public Vector2? ControlPoint1 { get; set; }
+    public Vector2? ControlPoint2 { get; set; }
 }
 public sealed record TransitionNodeDragSnapshot(
     DiagramTransition Transition,
@@ -554,7 +560,9 @@ public enum TransitionHandleKind
     TargetEndpoint,
     ControlPoint1,
     ControlPoint2,
-    Waypoint
+    Waypoint,
+    SegmentControlPoint1,
+    SegmentControlPoint2
 }
 public static class PrimitiveText
 {

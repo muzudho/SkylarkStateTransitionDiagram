@@ -86,6 +86,8 @@ public partial class Game1
                 TransitionHandleKind.ControlPoint1 => control1,
                 TransitionHandleKind.ControlPoint2 => control2,
                 TransitionHandleKind.Waypoint when handle.WaypointIndex >= 0 && handle.WaypointIndex < handle.Transition.Waypoints.Count => handle.Transition.Waypoints[handle.WaypointIndex],
+                TransitionHandleKind.SegmentControlPoint1 when handle.WaypointIndex >= 0 && TryGetTransitionPath(handle.Transition, out var handlePoints1) => GetTransitionSegmentControlPoint(handlePoints1, handle.Transition.SegmentControls, handle.WaypointIndex, true),
+                TransitionHandleKind.SegmentControlPoint2 when handle.WaypointIndex >= 0 && TryGetTransitionPath(handle.Transition, out var handlePoints2) => GetTransitionSegmentControlPoint(handlePoints2, handle.Transition.SegmentControls, handle.WaypointIndex, false),
                 _ => Vector2.Zero
             };
             if (center != Vector2.Zero)
@@ -106,13 +108,20 @@ public partial class Game1
         {
             if (transition.Waypoints.Count > 0 && TryGetTransitionPath(transition, out var points))
             {
-                _edgeRenderer.DrawTransitionPathHoverCue(points, totalGameTime);
+                _edgeRenderer.DrawTransitionPathHoverCue(transition, points, totalGameTime);
             }
             else if (TryGetTransitionGeometry(transition, out start, out control1, out control2, out end))
             {
                 _edgeRenderer.DrawTransitionHoverCue(start, control1, control2, end, totalGameTime);
             }
         }
+    }
+
+
+    private static Vector2 GetTransitionSegmentControlPoint(IReadOnlyList<Vector2> points, IReadOnlyList<TransitionSegmentControls> segmentControls, int segmentIndex, bool firstControlPoint)
+    {
+        GetTransitionPathSegmentControlPoints(points, segmentIndex, segmentControls, out var control1, out var control2);
+        return firstControlPoint ? control1 : control2;
     }
 
     private void DrawDiagramScene(Matrix transformMatrix, bool includeInteraction, TimeSpan totalGameTime)
@@ -146,7 +155,8 @@ public partial class Game1
                     LabelOffset = transition.LabelOffset,
                     ControlPoint1 = transition.ControlPoint1,
                     ControlPoint2 = transition.ControlPoint2,
-                    Waypoints = transition.Waypoints.ToList()
+                    Waypoints = transition.Waypoints.ToList(),
+                    SegmentControls = transition.SegmentControls.Select(CloneTransitionSegmentControls).ToList()
                 };
             if (transition.Waypoints.Count > 0 && TryGetTransitionPath(transition, out var points))
             {
@@ -219,7 +229,7 @@ public partial class Game1
         {
             if (_selectedTransition.Waypoints.Count > 0 && TryGetTransitionPath(_selectedTransition, out var points))
             {
-                _edgeRenderer.DrawTransitionPathHandles(points);
+                _edgeRenderer.DrawTransitionPathHandles(_selectedTransition, points);
             }
             else if (TryGetTransitionGeometry(_selectedTransition, out var start, out var control1, out var control2, out var end))
             {

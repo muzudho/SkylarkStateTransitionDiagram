@@ -133,6 +133,7 @@ public partial class Game1
                 {
                     TransitionHandleKind.SourceEndpoint or TransitionHandleKind.TargetEndpoint => "遷移の接点を円周上で移動中です。",
                     TransitionHandleKind.Waypoint => "遷移の中間点を移動中です。Deleteで削除できます。",
+                    TransitionHandleKind.SegmentControlPoint1 or TransitionHandleKind.SegmentControlPoint2 => "セグメントの曲がり具合を調整中です。",
                     _ => "遷移の曲がり方を調整中です。"
                 };
                 return;
@@ -336,11 +337,11 @@ public partial class Game1
 
         if (transition.Waypoints.Count > 0)
         {
-            if (!TryGetTransitionPath(transition, out var points) || DistanceToTransitionPath(mousePosition, points) > hitDistance)
+            if (!TryGetTransitionPath(transition, out var points) || DistanceToTransitionPath(mousePosition, points, transition.SegmentControls) > hitDistance)
             {
                 return false;
             }
-            insertIndex = FindNearestTransitionPathInsertIndex(mousePosition, points);
+            insertIndex = FindNearestTransitionPathInsertIndex(mousePosition, points, transition.SegmentControls);
         }
         else
         {
@@ -354,6 +355,7 @@ public partial class Game1
         ExecuteUndoableChange(() =>
         {
             transition.Waypoints.Insert(insertIndex, waypoint);
+            transition.SegmentControls.Insert(insertIndex, new TransitionSegmentControls());
             UpdateTransitionWaypointEndpointAngles(transition);
         });
         _selectedNode = null;
@@ -364,13 +366,13 @@ public partial class Game1
         return true;
     }
 
-    private static int FindNearestTransitionPathInsertIndex(Vector2 point, IReadOnlyList<Vector2> points)
+    private static int FindNearestTransitionPathInsertIndex(Vector2 point, IReadOnlyList<Vector2> points, IReadOnlyList<TransitionSegmentControls>? segmentControls)
     {
         var bestSegmentIndex = 0;
         var bestDistance = float.MaxValue;
         for (var i = 0; i < points.Count - 1; i++)
         {
-            GetTransitionPathSegmentControlPoints(points, i, out var control1, out var control2);
+            GetTransitionPathSegmentControlPoints(points, i, segmentControls, out var control1, out var control2);
             var distance = DistanceToBezier(point, points[i], control1, control2, points[i + 1]);
             if (distance < bestDistance)
             {
@@ -424,7 +426,14 @@ public partial class Game1
 
         var transition = _selectedWaypointTransition;
         var index = _selectedWaypointIndex;
-        ExecuteUndoableChange(() => transition.Waypoints.RemoveAt(index));
+        ExecuteUndoableChange(() =>
+        {
+            transition.Waypoints.RemoveAt(index);
+            if (index < transition.SegmentControls.Count)
+            {
+                transition.SegmentControls.RemoveAt(index);
+            }
+        });
         _selectedWaypointTransition = null;
         _selectedWaypointIndex = -1;
         _selectedTransition = transition;
@@ -716,8 +725,8 @@ public partial class Game1
             {
                 return;
             }
-            anchorT = FindNearestTransitionPathT(labelCenter, points);
-            anchor = GetTransitionPathPoint(points, anchorT);
+            anchorT = FindNearestTransitionPathT(labelCenter, points, transition.SegmentControls);
+            anchor = GetTransitionPathPoint(points, anchorT, transition.SegmentControls);
         }
         else
         {
@@ -738,7 +747,7 @@ public partial class Game1
         {
             if (transition.Waypoints.Count > 0)
             {
-                if (TryGetTransitionPath(transition, out var points) && DistanceToTransitionPath(position, points) <= 8f)
+                if (TryGetTransitionPath(transition, out var points) && DistanceToTransitionPath(position, points, transition.SegmentControls) <= 8f)
                 {
                     return transition;
                 }
@@ -780,13 +789,45 @@ public partial class Game1
             return false;
         }
 
-        for (var i = 0; i < transition.Waypoints.Count; i++)
+        if (Vector2.Distance(position, start) <= 14f)
         {
-            if (Vector2.Distance(position, transition.Waypoints[i]) <= 14f)
+            hit = new TransitionHandleHit(transition, TransitionHandleKind.SourceEndpoint);
+            return true;
+        }
+
+        if (Vector2.Distance(position, end) <= 14f)
+        {
+            hit = new TransitionHandleHit(transition, TransitionHandleKind.TargetEndpoint);
+            return true;
+        }
+
+        if (transition.Waypoints.Count > 0 && TryGetTransitionPath(transition, out var points))
+        {
+            for (var segmentIndex = 0; segmentIndex < points.Count - 1; segmentIndex++)
             {
-                hit = new TransitionHandleHit(transition, TransitionHandleKind.Waypoint, i);
-                return true;
+                GetTransitionPathSegmentControlPoints(points, segmentIndex, transition.SegmentControls, out var segmentControl1, out var segmentControl2);
+                if (Vector2.Distance(position, segmentControl1) <= 14f)
+                {
+                    hit = new TransitionHandleHit(transition, TransitionHandleKind.SegmentControlPoint1, segmentIndex);
+                    return true;
+                }
+                if (Vector2.Distance(position, segmentControl2) <= 14f)
+                {
+                    hit = new TransitionHandleHit(transition, TransitionHandleKind.SegmentControlPoint2, segmentIndex);
+                    return true;
+                }
             }
+
+            for (var i = 0; i < transition.Waypoints.Count; i++)
+            {
+                if (Vector2.Distance(position, transition.Waypoints[i]) <= 14f)
+                {
+                    hit = new TransitionHandleHit(transition, TransitionHandleKind.Waypoint, i);
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         if (Vector2.Distance(position, start) <= 14f)
@@ -801,10 +842,6 @@ public partial class Game1
             return true;
         }
 
-        if (transition.Waypoints.Count > 0)
-        {
-            return false;
-        }
 
         if (Vector2.Distance(position, control1) <= 14f)
         {
@@ -823,13 +860,13 @@ public partial class Game1
     private static Vector2 GetTransitionPathLabelCenter(IReadOnlyList<Vector2> points, DiagramTransition transition, int labelWidth, int labelHeight)
     {
         var anchorT = MathHelper.Clamp(transition.LabelAnchorT, 0f, 1f);
-        var anchor = GetTransitionPathPoint(points, anchorT);
+        var anchor = GetTransitionPathPoint(points, anchorT, transition.SegmentControls);
         if (transition.LabelOffset.HasValue)
         {
             return anchor + transition.LabelOffset.Value;
         }
 
-        var tangent = GetTransitionPathTangent(points, anchorT);
+        var tangent = GetTransitionPathTangent(points, anchorT, transition.SegmentControls);
         var side = transition.LabelSide == 0 ? -1f : 1f;
         if (MathF.Abs(tangent.X) >= MathF.Abs(tangent.Y))
         {

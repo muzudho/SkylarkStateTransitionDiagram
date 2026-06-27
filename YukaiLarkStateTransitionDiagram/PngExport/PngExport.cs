@@ -204,6 +204,17 @@ public partial class Game1
             {
                 Include(waypoint);
             }
+            foreach (var controls in transition.SegmentControls)
+            {
+                if (controls.ControlPoint1.HasValue)
+                {
+                    Include(controls.ControlPoint1.Value);
+                }
+                if (controls.ControlPoint2.HasValue)
+                {
+                    Include(controls.ControlPoint2.Value);
+                }
+            }
             Include(end);
             if (TryGetTransitionLabelBounds(transition, out var labelTopLeft, out var labelSize))
             {
