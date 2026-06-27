@@ -52,7 +52,7 @@ Visual Studio から起動する場合は、`YukaiLarkStateTransitionDiagram.sln
 | 遷移を作成 | `Shift` + 状態から状態へ左ドラッグ |
 | 自己ループを作成 | `Shift` + 同じ状態上で左ドラッグして離す |
 | 保存 | `Ctrl + S` |
-| 読込 | `Ctrl + O` |
+| 開く | `Ctrl + O` |
 | PNG画像として出力 | `Ctrl + P` |
 
 詳しい操作は [使い方説明書](YukaiLarkStateTransitionDiagram/Docs/使い方説明書.md) を見てください。

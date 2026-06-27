@@ -79,11 +79,6 @@ public partial class Game1
         }
         if (IsControlDown(keyboard) && IsNewKeyPress(keyboard, Keys.O))
         {
-            LoadDiagramFromDialog();
-            return;
-        }
-        if (IsControlDown(keyboard) && IsNewKeyPress(keyboard, Keys.R))
-        {
             OpenFileMenu(isStartup: false);
             return;
         }

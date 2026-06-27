@@ -242,7 +242,7 @@ public sealed class ShortcutKeyRenderer : IDisposable
                 new HelpPage
                 (
                     [
-                        new HelpHint("Ctrl+O", "読込"),
+                        new HelpHint("Ctrl+O", "開く"),
                         new HelpHint("Ctrl+P", "PNG出力"),
                         new HelpHint("T", "テーマ選択"),
                         new HelpHint("0-9", "テーマ"),
@@ -285,7 +285,7 @@ public sealed class ShortcutKeyRenderer : IDisposable
                 new HelpPage
                 (
                     [
-                        new HelpHint("Ctrl+O", "読込"),
+                        new HelpHint("Ctrl+O", "開く"),
                         new HelpHint("Ctrl+P", "PNG出力"),
                         new HelpHint("T", "テーマ選択"),
                         new HelpHint("0-9", "テーマ"),
@@ -312,7 +312,7 @@ public sealed class ShortcutKeyRenderer : IDisposable
             (
                 [
                     new HelpHint("Ctrl+Shift+S", "名前を付けて保存"),
-                    new HelpHint("Ctrl+O", "読込"),
+                    new HelpHint("Ctrl+O", "開く"),
                     new HelpHint("Ctrl+P", "PNG出力")
                 ]
             ),
