@@ -8,6 +8,8 @@ using Microsoft.Xna.Framework.Graphics;
 
 public sealed class EdgeRenderer
 {
+    private const float TransitionLineThickness = 3f;
+
     private readonly PrimitiveRenderer _primitiveRenderer;
     private readonly SpriteBatch _spriteBatch;
     private readonly Func<string, bool, Texture2D> _getLabelTexture;
@@ -41,7 +43,7 @@ public sealed class EdgeRenderer
         bool drawStartMarkerFlowLine)
     {
         var lineColor = selected ? Theme.SelectedTransitionLineColor : Theme.TransitionLineColor;
-        var thickness = selected ? 4f : 3f;
+        const float thickness = TransitionLineThickness;
 
         if (selected)
         {
@@ -121,7 +123,7 @@ public sealed class EdgeRenderer
         bool drawStartMarkerFlowLine)
     {
         var lineColor = selected ? Theme.SelectedTransitionLineColor : Theme.TransitionLineColor;
-        var thickness = selected ? 4f : 3f;
+        const float thickness = TransitionLineThickness;
 
         if (drawStartMarkerFlowLine)
         {
@@ -561,7 +563,7 @@ public sealed class EdgeRenderer
             previousRight = right;
         }
 
-        DrawArrowHead(end, CubicBezierTangent(start, control1, control2, end, 1f), color, selected ? 4f : 3f);
+        DrawArrowHead(end, CubicBezierTangent(start, control1, control2, end, 1f), color, TransitionLineThickness);
     }
 
     private void DrawSelectedTransitionEffect(Vector2 start, Vector2 control1, Vector2 control2, Vector2 end)
@@ -687,7 +689,7 @@ public sealed class EdgeRenderer
 
         if (points.Count >= 2)
         {
-            DrawArrowHead(points[^1], GetTransitionPathTangent(points, 1f, segmentControls), color, selected ? 4f : 3f);
+            DrawArrowHead(points[^1], GetTransitionPathTangent(points, 1f, segmentControls), color, TransitionLineThickness);
         }
     }
 
@@ -806,8 +808,8 @@ public sealed class EdgeRenderer
         var direction = Vector2.Normalize(end - start);
         var arrowEndLocation = end;
 
-        // 矢印の頭の左右の羽を描く
-        DrawSymmetricArrowHead(arrowEndLocation, direction, color, thickness);
+        // 矢終を三角の角として描く。
+        DrawArrowTipTriangle(arrowEndLocation, direction, color, thickness);
     }
 
     /// <summary>
@@ -825,44 +827,35 @@ public sealed class EdgeRenderer
         var direction = Vector2.Normalize(tangent);
         var arrowEndLocation = tip;
 
-        // 矢印の頭の左右の羽を描く
-        DrawSymmetricArrowHead(arrowEndLocation, direction, color, thickness);
+        // 矢終を三角の角として描く。
+        DrawArrowTipTriangle(arrowEndLocation, direction, color, thickness);
     }
 
     /// <summary>
-    /// 左右対称な矢印の羽を描く。
+    /// 矢終を塗りつぶし三角の角として描く。
     /// </summary>
     /// <param name="tip"></param>
     /// <param name="direction"></param>
     /// <param name="color"></param>
     /// <param name="thickness"></param>
-    private void DrawSymmetricArrowHead(Vector2 tip, Vector2 direction, Color color, float thickness)
+    private void DrawArrowTipTriangle(Vector2 tip, Vector2 direction, Color color, float thickness)
     {
-        var wingLength = 18f;
-        var wingAngle = MathHelper.ToRadians(28f);
-        var leftWing = Rotate(direction, wingAngle) * wingLength;
-        var rightWing = Rotate(direction, -wingAngle) * wingLength;
+        var length = MathF.Max(12f, thickness * 4.5f);
+        var halfWidth = MathF.Max(6f, thickness * 2.4f);
+        var normal = new Vector2(-direction.Y, direction.X);
+        var baseCenter = tip - (direction * length);
+        var leftBase = baseCenter + (normal * halfWidth);
+        var rightBase = baseCenter - (normal * halfWidth);
 
-        // 左右の羽を描く
-        _primitiveRenderer.DrawLine(tip, tip - leftWing, color, thickness);
-        _primitiveRenderer.DrawLine(tip, tip - rightWing, color, thickness);
+        const int fillSteps = 10;
+        for (var i = 0; i <= fillSteps; i++)
+        {
+            var t = i / (float)fillSteps;
+            var left = Vector2.Lerp(tip, leftBase, t);
+            var right = Vector2.Lerp(tip, rightBase, t);
+            _primitiveRenderer.DrawLine(left, right, color, MathF.Max(1.5f, thickness));
+        }
     }
-
-    /// <summary>
-    /// ベクトルを回転する。
-    /// </summary>
-    /// <param name="vector"></param>
-    /// <param name="radians"></param>
-    /// <returns></returns>
-    private static Vector2 Rotate(Vector2 vector, float radians)
-    {
-        var cos = MathF.Cos(radians);
-        var sin = MathF.Sin(radians);
-        return new Vector2(
-            vector.X * cos - vector.Y * sin,
-            vector.X * sin + vector.Y * cos);
-    }
-
     /// <summary>
     /// ベジェ曲線の点を計算
     /// </summary>
