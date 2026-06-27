@@ -39,10 +39,10 @@ public partial class Game1
                 UpdateTransitionEndpoint(transition, false, mousePosition);
                 break;
             case TransitionHandleKind.ControlPoint1:
-                transition.ControlPoint1 = mousePosition;
+                transition.ControlPoint1 = GetConstrainedEndpointControlPoint(transition, isSourceControlPoint: true, mousePosition);
                 break;
             case TransitionHandleKind.ControlPoint2:
-                transition.ControlPoint2 = mousePosition;
+                transition.ControlPoint2 = GetConstrainedEndpointControlPoint(transition, isSourceControlPoint: false, mousePosition);
                 break;
             case TransitionHandleKind.Waypoint:
                 if (waypointIndex >= 0 && waypointIndex < transition.Waypoints.Count)
@@ -62,6 +62,23 @@ public partial class Game1
 
 
 
+
+    private Vector2 GetConstrainedEndpointControlPoint(DiagramTransition transition, bool isSourceControlPoint, Vector2 mousePosition)
+    {
+        if (!TryGetTransitionEndpoints(transition, out var start, out var end))
+        {
+            return mousePosition;
+        }
+
+        var anchor = isSourceControlPoint ? start : end;
+        var angle = isSourceControlPoint
+            ? transition.SourceAngle ?? AngleFromTo(start, end)
+            : transition.TargetAngle ?? AngleFromTo(end, start);
+        var direction = UnitVectorFromAngle(angle);
+        var length = MathF.Max(Vector2.Distance(anchor, mousePosition), DiagramNode.RadiusUnit * 0.5f);
+        return anchor + direction * length;
+    }
+
     private void SetTransitionSegmentControlPoint(DiagramTransition transition, int segmentIndex, bool isFirstControlPoint, Vector2 position)
     {
         if (segmentIndex < 0 || !TryGetTransitionPath(transition, out var points) || segmentIndex >= points.Count - 1)
@@ -72,14 +89,32 @@ public partial class Game1
         EnsureTransitionSegmentControls(transition, segmentIndex + 1);
         if (isFirstControlPoint)
         {
-            transition.SegmentControls[segmentIndex].ControlPoint1 = position;
-            AlignPreviousSegmentControlPointAngle(transition, points, segmentIndex, position);
+            var constrainedPosition = segmentIndex == 0
+                ? GetConstrainedPathEndpointControlPoint(transition, points, isSourceControlPoint: true, position)
+                : position;
+            transition.SegmentControls[segmentIndex].ControlPoint1 = constrainedPosition;
+            AlignPreviousSegmentControlPointAngle(transition, points, segmentIndex, constrainedPosition);
         }
         else
         {
-            transition.SegmentControls[segmentIndex].ControlPoint2 = position;
-            AlignNextSegmentControlPointAngle(transition, points, segmentIndex, position);
+            var constrainedPosition = segmentIndex == points.Count - 2
+                ? GetConstrainedPathEndpointControlPoint(transition, points, isSourceControlPoint: false, position)
+                : position;
+            transition.SegmentControls[segmentIndex].ControlPoint2 = constrainedPosition;
+            AlignNextSegmentControlPointAngle(transition, points, segmentIndex, constrainedPosition);
         }
+    }
+
+
+    private static Vector2 GetConstrainedPathEndpointControlPoint(DiagramTransition transition, IReadOnlyList<Vector2> points, bool isSourceControlPoint, Vector2 mousePosition)
+    {
+        var anchor = isSourceControlPoint ? points[0] : points[^1];
+        var angle = isSourceControlPoint
+            ? transition.SourceAngle ?? AngleFromTo(points[0], points[1])
+            : transition.TargetAngle ?? AngleFromTo(points[^1], points[^2]);
+        var direction = UnitVectorFromAngle(angle);
+        var length = MathF.Max(Vector2.Distance(anchor, mousePosition), DiagramNode.RadiusUnit * 0.5f);
+        return anchor + direction * length;
     }
 
     private static void AlignPreviousSegmentControlPointAngle(DiagramTransition transition, IReadOnlyList<Vector2> points, int segmentIndex, Vector2 movedControlPoint)
@@ -227,8 +262,11 @@ public partial class Game1
         }
 
         var delta = end - start;
-        control1 = transition.ControlPoint1 ?? start + delta / 3f;
-        control2 = transition.ControlPoint2 ?? start + delta * 2f / 3f;
+        var handleLength = MathF.Max(delta.Length() / 3f, DiagramNode.RadiusUnit);
+        var sourceDirection = UnitVectorFromAngle(transition.SourceAngle ?? AngleFromTo(start, end));
+        var targetDirection = UnitVectorFromAngle(transition.TargetAngle ?? AngleFromTo(end, start));
+        control1 = transition.ControlPoint1 ?? start + sourceDirection * handleLength;
+        control2 = transition.ControlPoint2 ?? end + targetDirection * handleLength;
         return true;
     }
 
@@ -244,7 +282,29 @@ public partial class Game1
         points.Add(start);
         points.AddRange(transition.Waypoints);
         points.Add(end);
+        ConstrainPathEndpointControlAngles(transition, points);
         return true;
+    }
+
+
+    private static void ConstrainPathEndpointControlAngles(DiagramTransition transition, IReadOnlyList<Vector2> points)
+    {
+        if (points.Count < 2)
+        {
+            return;
+        }
+
+        EnsureTransitionSegmentControls(transition, points.Count - 1);
+        var sourceDirection = UnitVectorFromAngle(transition.SourceAngle ?? AngleFromTo(points[0], points[1]));
+        GetTransitionPathSegmentControlPoints(points, 0, transition.SegmentControls, out var firstControlPoint, out _);
+        var sourceHandleLength = MathF.Max(Vector2.Distance(points[0], firstControlPoint), DiagramNode.RadiusUnit * 0.5f);
+        transition.SegmentControls[0].ControlPoint1 = points[0] + sourceDirection * sourceHandleLength;
+
+        var lastSegmentIndex = points.Count - 2;
+        var targetDirection = UnitVectorFromAngle(transition.TargetAngle ?? AngleFromTo(points[^1], points[^2]));
+        GetTransitionPathSegmentControlPoints(points, lastSegmentIndex, transition.SegmentControls, out _, out var lastControlPoint);
+        var targetHandleLength = MathF.Max(Vector2.Distance(points[^1], lastControlPoint), DiagramNode.RadiusUnit * 0.5f);
+        transition.SegmentControls[lastSegmentIndex].ControlPoint2 = points[^1] + targetDirection * targetHandleLength;
     }
 
     private static Vector2 GetTransitionPathPoint(IReadOnlyList<Vector2> points, float t, IReadOnlyList<TransitionSegmentControls>? segmentControls = null)
@@ -402,8 +462,11 @@ public partial class Game1
         return length;
     }
 
+    private static Vector2 UnitVectorFromAngle(float angle)
+        => new(MathF.Cos(angle), MathF.Sin(angle));
+
     private static Vector2 PointOnCircle(Vector2 center, float radius, float angle)
-        => center + new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * radius;
+        => center + UnitVectorFromAngle(angle) * radius;
 
     private static float AngleFromTo(Vector2 from, Vector2 to)
         => MathF.Atan2(to.Y - from.Y, to.X - from.X);
