@@ -46,17 +46,70 @@ public partial class Game1
         DrawUiText("クリックや0-9キーで切り替えます。後ろの画面で見た目を確認できます。", new Vector2(panel.X + 24, panel.Y + 56), _boardTheme.PanelSecondaryTextColor, 15, false);
         DrawThemeMenuActionButtons();
         DrawThemeMenuPager();
+        DrawThemeMenuTableHeader();
+        DrawThemeMenuShortcutList();
 
         var pageCount = GetThemeMenuPageCount();
         var pageText = $"({_themeMenuPage + 1}/{pageCount})";
         var pageTexture = GetUiTextTexture(pageText, 15, true);
-        DrawUiText(pageText, new Vector2(panel.Right - pageTexture.Width - 24, panel.Y + 62), _boardTheme.PanelMutedTextColor, 15, true);
+        var table = GetThemeMenuThemeTableRectangle();
+        DrawUiText(pageText, new Vector2(table.Right - pageTexture.Width, panel.Y + 62), _boardTheme.PanelMutedTextColor, 15, true);
 
         var startIndex = GetThemeMenuVisibleStartIndex();
         var visibleCount = GetThemeMenuVisibleItemCount();
         for (var visibleIndex = 0; visibleIndex < visibleCount; visibleIndex++)
         {
             DrawThemeMenuItem(startIndex + visibleIndex, visibleIndex);
+        }
+    }
+
+    private void DrawThemeMenuTableHeader()
+    {
+        var table = GetThemeMenuThemeTableRectangle();
+        var shortcutList = GetThemeMenuShortcutListRectangle();
+        var headerY = table.Y - 24;
+
+        DrawUiText("テーマ一覧", new Vector2(table.X, headerY), _boardTheme.PanelPrimaryTextColor, 15, true);
+        DrawUiText("キー", new Vector2(table.X + 58, headerY), _boardTheme.PanelMutedTextColor, 13, true);
+        DrawUiText("テーマ", new Vector2(table.X + 92, headerY), _boardTheme.PanelMutedTextColor, 13, true);
+        DrawUiText("0-9 割り当て", new Vector2(shortcutList.X, headerY), _boardTheme.PanelPrimaryTextColor, 15, true);
+    }
+
+    private void DrawThemeMenuShortcutList()
+    {
+        var bounds = GetThemeMenuShortcutListRectangle();
+        _spriteBatch.Draw(_pixel, bounds, WithAlpha(Blend(_boardTheme.PanelBackgroundColor, _boardTheme.BackgroundColor, 0.16f), 220));
+        DrawScreenRectangleOutline(bounds, WithAlpha(_boardTheme.PanelTopEdgeColor, 176), 1);
+
+        const int rowHeight = 22;
+        for (var index = 0; index < 10; index++)
+        {
+            var row = new Rectangle(bounds.X + 8, bounds.Y + 8 + index * rowHeight, bounds.Width - 16, rowHeight - 2);
+            var hasTheme = index < _themeShortcutThemes.Count;
+            var theme = hasTheme ? _themeShortcutThemes[index] : null;
+            var selected = theme is not null && ReferenceEquals(theme, _keyCapTheme);
+            var themeBoard = theme is null ? _boardTheme : BoardThemes.ForKeyCapTheme(theme);
+            var faceColor = theme?.FaceColor ?? _keyCapTheme.FaceColor;
+            var bottomEdgeColor = theme?.BottomEdgeColor ?? _keyCapTheme.BottomEdgeColor;
+            var labelTextColor = theme?.LabelTextColor ?? _boardTheme.PanelMutedTextColor;
+            var rowFill = theme is null
+                ? WithAlpha(Blend(_boardTheme.PanelBackgroundColor, Color.Black, 0.08f), 120)
+                : WithAlpha(Blend(themeBoard.PanelBackgroundColor, faceColor, selected ? 0.34f : 0.2f), (byte)(selected ? 238 : 220));
+
+            _spriteBatch.Draw(_pixel, row, rowFill);
+            DrawScreenRectangleOutline(row, WithAlpha(bottomEdgeColor, (byte)(selected ? 224 : 150)), 1);
+
+            var keyBounds = new Rectangle(row.X + 3, row.Y + 2, 28, row.Height - 4);
+            _spriteBatch.Draw(_pixel, keyBounds, WithAlpha(faceColor, 226));
+            DrawScreenRectangleOutline(keyBounds, WithAlpha(bottomEdgeColor, 220), 1);
+
+            var keyText = index.ToString();
+            var keyTexture = GetUiTextTexture(keyText, 12, true);
+            DrawUiText(keyText, new Vector2(keyBounds.X + (keyBounds.Width - keyTexture.Width) / 2, keyBounds.Y + 2), labelTextColor, 12, true);
+
+            var name = theme?.Name ?? "-";
+            var textColor = theme is null ? _boardTheme.PanelMutedTextColor : themeBoard.PanelPrimaryTextColor;
+            DrawUiText(name, new Vector2(row.X + 40, row.Y + 2), textColor, 12, true);
         }
     }
 

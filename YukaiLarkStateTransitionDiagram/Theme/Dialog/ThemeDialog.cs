@@ -192,19 +192,33 @@ public partial class Game1
     private Rectangle GetThemeMenuPanelRectangle()
     {
         var viewport = GraphicsDevice.Viewport;
-        var width = Math.Clamp(viewport.Width - 64, 520, 680);
-        var height = Math.Min(viewport.Height - 64, 148 + ThemeMenuPageSize * 48);
+        var width = Math.Clamp(viewport.Width - 64, 680, 860);
+        var height = Math.Min(viewport.Height - 64, 172 + ThemeMenuPageSize * 48);
         var x = (viewport.Width - width) / 2;
         var y = Math.Max(24, (viewport.Height - height) / 2);
         return new Rectangle(x, y, width, height);
     }
 
-    private Rectangle GetThemeMenuItemRectangle(int visibleIndex)
+    private Rectangle GetThemeMenuThemeTableRectangle()
     {
         var panel = GetThemeMenuPanelRectangle();
-        var x = panel.X + 24;
-        var y = panel.Y + 92 + visibleIndex * 48;
-        return new Rectangle(x, y, panel.Width - 48, 40);
+        var shortcutList = GetThemeMenuShortcutListRectangle();
+        var width = Math.Max(360, shortcutList.X - panel.X - 42);
+        return new Rectangle(panel.X + 24, panel.Y + 116, width, ThemeMenuPageSize * 48);
+    }
+
+    private Rectangle GetThemeMenuShortcutListRectangle()
+    {
+        var panel = GetThemeMenuPanelRectangle();
+        var width = Math.Clamp(panel.Width / 3, 206, 254);
+        return new Rectangle(panel.Right - width - 24, panel.Y + 116, width, ThemeMenuPageSize * 48);
+    }
+
+    private Rectangle GetThemeMenuItemRectangle(int visibleIndex)
+    {
+        var table = GetThemeMenuThemeTableRectangle();
+        var y = table.Y + visibleIndex * 48;
+        return new Rectangle(table.X, y, table.Width, 40);
     }
 
     private Rectangle GetThemeMenuConfirmButtonRectangle()
@@ -221,9 +235,11 @@ public partial class Game1
 
     private Rectangle GetThemeMenuPagerRailRectangle()
     {
+        var table = GetThemeMenuThemeTableRectangle();
         var panel = GetThemeMenuPanelRectangle();
         var cancelButton = GetThemeMenuCancelButtonRectangle();
-        return new Rectangle(panel.X + 24, panel.Bottom - 44, Math.Max(126, cancelButton.X - panel.X - 36), 32);
+        var width = Math.Min(table.Width, Math.Max(126, cancelButton.X - table.X - 12));
+        return new Rectangle(table.X, panel.Bottom - 44, width, 32);
     }
 
     private Rectangle GetThemeMenuPreviousPageButtonRectangle()
@@ -329,6 +345,12 @@ public partial class Game1
             return;
         }
 
+        if (_isThemeMenuOpen)
+        {
+            AssignCurrentThemeToShortcut(shortcutIndex);
+            return;
+        }
+
         var previousTheme = _keyCapTheme;
         var nextTheme = _themeShortcutThemes[shortcutIndex];
         var previousShortcutIndex = GetShortcutIndexForTheme(previousTheme);
@@ -349,6 +371,29 @@ public partial class Game1
         {
             _status = $"テーマ {shortcutIndex}: {nextTheme.Name} を選択中です。";
         }
+    }
+
+    private void AssignCurrentThemeToShortcut(int shortcutIndex)
+    {
+        var selectedTheme = _keyCapTheme;
+        var assignedTheme = _themeShortcutThemes[shortcutIndex];
+        var selectedShortcutIndex = GetShortcutIndexForTheme(selectedTheme);
+
+        if (ReferenceEquals(selectedTheme, assignedTheme))
+        {
+            _status = $"{shortcutIndex}キーには既に {selectedTheme.Name} が割り当てられています。";
+            return;
+        }
+
+        _themeShortcutThemes[shortcutIndex] = selectedTheme;
+        if (selectedShortcutIndex is not null && selectedShortcutIndex.Value != shortcutIndex)
+        {
+            _themeShortcutThemes[selectedShortcutIndex.Value] = assignedTheme;
+            _status = $"{shortcutIndex}キーに {selectedTheme.Name} を割り当て、{selectedShortcutIndex.Value}キーへ {assignedTheme.Name} を移しました。";
+            return;
+        }
+
+        _status = $"{shortcutIndex}キーに {selectedTheme.Name} を割り当てました。";
     }
 
     private void ApplyConfiguredTheme()
