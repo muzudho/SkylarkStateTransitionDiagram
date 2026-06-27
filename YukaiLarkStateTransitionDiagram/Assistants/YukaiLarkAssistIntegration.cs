@@ -71,13 +71,20 @@ public partial class Game1
     {
         distance = 0f;
         var viewport = GraphicsDevice.Viewport;
-        if (_nodes.Count < 2 || viewport.Width < 760)
+        if (_nodes.Count < 2 || viewport.Width < 760 || _cameraZoom <= 0f)
         {
             return false;
         }
 
         var minX = float.MaxValue;
         var maxX = float.MinValue;
+        void IncludeScreenX(Vector2 worldPosition)
+        {
+            var screenX = WorldToScreen(worldPosition).X;
+            minX = MathF.Min(minX, screenX);
+            maxX = MathF.Max(maxX, screenX);
+        }
+
         foreach (var node in _nodes)
         {
             var screenPosition = WorldToScreen(node.Position);
@@ -86,26 +93,53 @@ public partial class Game1
             maxX = MathF.Max(maxX, screenPosition.X + screenRadius);
         }
 
-        const float leftComfortPadding = 140f;
-        const float rightTriggerPadding = 180f;
-        const float desiredRightPadding = 320f;
-        const float minShift = 120f;
-        const float maxShift = 360f;
-        if (maxX < viewport.Width - rightTriggerPadding || minX < leftComfortPadding + minShift)
+        foreach (var transition in _transitions)
+        {
+            if (transition.ControlPoint1.HasValue)
+            {
+                IncludeScreenX(transition.ControlPoint1.Value);
+            }
+            if (transition.ControlPoint2.HasValue)
+            {
+                IncludeScreenX(transition.ControlPoint2.Value);
+            }
+            foreach (var waypoint in transition.Waypoints)
+            {
+                IncludeScreenX(waypoint);
+            }
+            foreach (var segmentControls in transition.SegmentControls)
+            {
+                if (segmentControls.ControlPoint1.HasValue)
+                {
+                    IncludeScreenX(segmentControls.ControlPoint1.Value);
+                }
+                if (segmentControls.ControlPoint2.HasValue)
+                {
+                    IncludeScreenX(segmentControls.ControlPoint2.Value);
+                }
+            }
+        }
+
+        var workAreaRight = viewport.Width;
+        if (InspectorPanelRenderer.TryGetPanelBounds(viewport, out var inspectorBounds))
+        {
+            workAreaRight = inspectorBounds.X;
+        }
+
+        const float leftComfortPadding = 80f;
+        const float minShiftScreen = 48f;
+        var workAreaLeft = leftComfortPadding;
+        var workAreaCenter = (workAreaLeft + workAreaRight) / 2f;
+        var diagramCenter = (minX + maxX) / 2f;
+        var screenShift = diagramCenter - workAreaCenter;
+        if (screenShift < minShiftScreen)
         {
             return false;
         }
 
-        var shiftForRightSpace = maxX - (viewport.Width - desiredRightPadding);
-        var shiftBeforeLeftCrowding = minX - leftComfortPadding;
-        var rawShift = MathF.Min(maxShift, MathF.Min(shiftForRightSpace, shiftBeforeLeftCrowding));
-        if (rawShift < minShift)
-        {
-            return false;
-        }
-
-        distance = MathF.Floor(rawShift / DiagramNode.RadiusUnit) * DiagramNode.RadiusUnit;
-        return distance >= minShift;
+        var worldShift = screenShift / _cameraZoom;
+        distance = MathF.Floor(worldShift / DiagramNode.RadiusUnit) * DiagramNode.RadiusUnit;
+        return distance > 0f;
     }
     private string GetMissingTransitionEventSummary()
     {
