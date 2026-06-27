@@ -269,17 +269,46 @@ public sealed class NodeRenderer
 
     private Color GetReadableTextColor(Color fill)
     {
-        if (GetLuminance(fill) >= 0.50f)
+        var darkText = WithAlpha(Blend(Theme.TransitionLabelColor, Color.Black, 0.68f), 248);
+        var lightText = WithAlpha(Theme.PhotoPaperColor, 248);
+        var darkContrast = GetContrastRatio(fill, darkText);
+        var lightContrast = GetContrastRatio(fill, lightText);
+        var bestText = darkContrast >= lightContrast ? darkText : lightText;
+        var bestContrast = MathF.Max(darkContrast, lightContrast);
+
+        if (bestContrast >= 4.5f)
         {
-            return WithAlpha(Blend(Theme.TransitionLabelColor, Color.Black, 0.22f), 248);
+            return bestText;
         }
 
-        return WithAlpha(Theme.PhotoPaperColor, 248);
+        var blackContrast = GetContrastRatio(fill, Color.Black);
+        var whiteContrast = GetContrastRatio(fill, Color.White);
+        return blackContrast >= whiteContrast
+            ? WithAlpha(Color.Black, 248)
+            : WithAlpha(Color.White, 248);
     }
 
-    private static float GetLuminance(Color color)
-        => ((0.2126f * color.R) + (0.7152f * color.G) + (0.0722f * color.B)) / 255f;
+    private static float GetContrastRatio(Color first, Color second)
+    {
+        var firstLuminance = GetRelativeLuminance(first);
+        var secondLuminance = GetRelativeLuminance(second);
+        var lighter = MathF.Max(firstLuminance, secondLuminance);
+        var darker = MathF.Min(firstLuminance, secondLuminance);
+        return (lighter + 0.05f) / (darker + 0.05f);
+    }
 
+    private static float GetRelativeLuminance(Color color)
+        => (0.2126f * GetLinearChannel(color.R))
+            + (0.7152f * GetLinearChannel(color.G))
+            + (0.0722f * GetLinearChannel(color.B));
+
+    private static float GetLinearChannel(byte channel)
+    {
+        var value = channel / 255f;
+        return value <= 0.03928f
+            ? value / 12.92f
+            : MathF.Pow((value + 0.055f) / 1.055f, 2.4f);
+    }
     private static Color WithAlpha(Color color, byte alpha)
         => new(color.R, color.G, color.B, alpha);
     private Color GetInactiveColor(Color color, float opacity)
