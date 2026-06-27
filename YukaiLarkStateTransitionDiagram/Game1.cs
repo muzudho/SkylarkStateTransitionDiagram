@@ -810,23 +810,24 @@ public class Game1 : Game
     {
         var theme = KeyCapThemes.AllThemes[themeIndex];
         var bounds = GetThemeMenuItemRectangle(visibleIndex);
+        var themeField = new Rectangle(bounds.X, bounds.Y, bounds.Width - 92, bounds.Height);
         var selected = ReferenceEquals(theme, _keyCapTheme);
         var themeBoard = BoardThemes.ForKeyCapTheme(theme);
-        var fill = selected ? WithAlpha(theme.FaceColor, 238) : WithAlpha(Blend(themeBoard.PanelBackgroundColor, theme.FaceColor, 0.18f), 232);
-        var edge = selected ? theme.BottomEdgeColor : WithAlpha(theme.BottomEdgeColor, 190);
+        var fill = WithAlpha(Blend(themeBoard.PanelBackgroundColor, theme.FaceColor, 0.18f), 232);
+        var edge = WithAlpha(theme.BottomEdgeColor, 190);
 
-        _spriteBatch.Draw(_pixel, bounds, fill);
-        DrawScreenRectangleOutline(bounds, edge, selected ? 2 : 1);
-        _spriteBatch.Draw(_pixel, new Rectangle(bounds.X + 12, bounds.Y + 10, 34, 24), theme.FaceColor);
-        DrawScreenRectangleOutline(new Rectangle(bounds.X + 12, bounds.Y + 10, 34, 24), theme.BottomEdgeColor, 1);
+        _spriteBatch.Draw(_pixel, themeField, fill);
+        DrawScreenRectangleOutline(themeField, edge, 1);
+        _spriteBatch.Draw(_pixel, new Rectangle(themeField.X + 12, themeField.Y + 10, 34, 24), theme.FaceColor);
+        DrawScreenRectangleOutline(new Rectangle(themeField.X + 12, themeField.Y + 10, 34, 24), theme.BottomEdgeColor, 1);
 
         var shortcut = GetShortcutIndexForTheme(theme);
         var shortcutText = shortcut is null ? "-" : shortcut.Value.ToString();
-        DrawUiText(shortcutText, new Vector2(bounds.X + 58, bounds.Y + 12), theme.LabelTextColor, 16, true);
-        DrawUiText(theme.Name, new Vector2(bounds.X + 92, bounds.Y + 11), themeBoard.PanelPrimaryTextColor, 17, true);
+        DrawUiText(shortcutText, new Vector2(themeField.X + 58, themeField.Y + 12), theme.LabelTextColor, 16, true);
+        DrawUiText(theme.Name, new Vector2(themeField.X + 92, themeField.Y + 11), themeBoard.PanelPrimaryTextColor, 17, true);
         if (selected)
         {
-            DrawUiText("選択中", new Vector2(bounds.Right - 78, bounds.Y + 13), themeBoard.PanelPrimaryTextColor, 14, true);
+            DrawUiText("選択中", new Vector2(themeField.Right + 18, bounds.Y + 13), _boardTheme.PanelPrimaryTextColor, 14, true);
         }
     }
 
