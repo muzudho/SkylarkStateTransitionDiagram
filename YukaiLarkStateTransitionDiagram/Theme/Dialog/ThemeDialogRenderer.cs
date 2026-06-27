@@ -81,10 +81,9 @@ public partial class Game1
         _spriteBatch.Draw(_pixel, bounds, WithAlpha(Blend(_boardTheme.PanelBackgroundColor, _boardTheme.BackgroundColor, 0.16f), 220));
         DrawScreenRectangleOutline(bounds, WithAlpha(_boardTheme.PanelTopEdgeColor, 176), 1);
 
-        const int rowHeight = 22;
         for (var index = 0; index < 10; index++)
         {
-            var row = new Rectangle(bounds.X + 8, bounds.Y + 8 + index * rowHeight, bounds.Width - 16, rowHeight - 2);
+            var row = GetThemeMenuShortcutItemRectangle(index);
             var hasTheme = index < _themeShortcutThemes.Count;
             var theme = hasTheme ? _themeShortcutThemes[index] : null;
             var selected = theme is not null && ReferenceEquals(theme, _keyCapTheme);

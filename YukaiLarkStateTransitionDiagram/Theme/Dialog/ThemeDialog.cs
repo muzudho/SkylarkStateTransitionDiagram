@@ -164,6 +164,15 @@ public partial class Game1
             }
         }
 
+        for (var shortcutIndex = 0; shortcutIndex < 10; shortcutIndex++)
+        {
+            if (GetThemeMenuShortcutItemRectangle(shortcutIndex).Contains(point))
+            {
+                SelectThemeShortcutTheme(shortcutIndex);
+                return;
+            }
+        }
+
         var startIndex = GetThemeMenuVisibleStartIndex();
         var visibleCount = GetThemeMenuVisibleItemCount();
         for (var visibleIndex = 0; visibleIndex < visibleCount; visibleIndex++)
@@ -219,6 +228,13 @@ public partial class Game1
         var table = GetThemeMenuThemeTableRectangle();
         var y = table.Y + visibleIndex * 48;
         return new Rectangle(table.X, y, table.Width, 40);
+    }
+
+    private Rectangle GetThemeMenuShortcutItemRectangle(int shortcutIndex)
+    {
+        const int rowHeight = 22;
+        var bounds = GetThemeMenuShortcutListRectangle();
+        return new Rectangle(bounds.X + 8, bounds.Y + 8 + shortcutIndex * rowHeight, bounds.Width - 16, rowHeight - 2);
     }
 
     private Rectangle GetThemeMenuConfirmButtonRectangle()
@@ -321,6 +337,19 @@ public partial class Game1
         var pageCount = GetThemeMenuPageCount();
         _themeMenuPage = Math.Clamp(pageIndex, 0, pageCount - 1);
         _status = $"テーマ表ページ {_themeMenuPage + 1}/{pageCount} を表示しています。";
+    }
+
+    private void SelectThemeShortcutTheme(int shortcutIndex)
+    {
+        if (shortcutIndex < 0 || shortcutIndex >= _themeShortcutThemes.Count)
+        {
+            return;
+        }
+
+        var theme = _themeShortcutThemes[shortcutIndex];
+        _themeMenuPage = GetThemePageForTheme(theme);
+        ApplyKeyCapTheme(theme);
+        _status = $"{shortcutIndex}キーに割り当てた {theme.Name} をテーマ一覧で選択しました。";
     }
 
     private bool TryGetThemeShortcutIndex(KeyboardState keyboard, out int themeIndex)
