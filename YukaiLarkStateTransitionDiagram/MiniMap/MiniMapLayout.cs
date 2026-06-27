@@ -27,9 +27,9 @@ public sealed class MiniMapLayout
     public Rectangle MapBounds => _mapBounds;
     public MiniMapWorldBounds WorldBounds => _worldBounds;
 
-    public static MiniMapLayout Create(Rectangle mapBounds, IReadOnlyList<DiagramNode> nodes, Viewport viewport, Vector2 cameraOffset)
+    public static MiniMapLayout Create(Rectangle mapBounds, IReadOnlyList<DiagramNode> nodes, Viewport viewport, Vector2 cameraOffset, float cameraZoom)
     {
-        var worldBounds = CreateWorldBounds(nodes, viewport, cameraOffset);
+        var worldBounds = CreateWorldBounds(nodes, viewport, cameraOffset, cameraZoom);
         var contentWidth = Math.Max(1f, mapBounds.Width - ContentPadding * 2f);
         var contentHeight = Math.Max(1f, mapBounds.Height - ContentPadding * 2f);
         var scale = Math.Min(contentWidth / worldBounds.Width, contentHeight / worldBounds.Height);
@@ -51,19 +51,19 @@ public sealed class MiniMapLayout
             _worldBounds.X + (mapPosition.X - _contentOffset.X) / _scale,
             _worldBounds.Y + (mapPosition.Y - _contentOffset.Y) / _scale);
 
-    public Rectangle GetViewportRectangle(Viewport viewport, Vector2 cameraOffset)
+    public Rectangle GetViewportRectangle(Viewport viewport, Vector2 cameraOffset, float cameraZoom)
     {
-        var worldTopLeft = -cameraOffset;
-        var worldBottomRight = new Vector2(viewport.Width, viewport.Height) - cameraOffset;
+        var worldTopLeft = -cameraOffset / cameraZoom;
+        var worldBottomRight = (new Vector2(viewport.Width, viewport.Height) - cameraOffset) / cameraZoom;
         var mapTopLeft = WorldToMap(worldTopLeft);
         var mapBottomRight = WorldToMap(worldBottomRight);
         return RectangleFromPoints(mapTopLeft, mapBottomRight);
     }
 
-    private static MiniMapWorldBounds CreateWorldBounds(IReadOnlyList<DiagramNode> nodes, Viewport viewport, Vector2 cameraOffset)
+    private static MiniMapWorldBounds CreateWorldBounds(IReadOnlyList<DiagramNode> nodes, Viewport viewport, Vector2 cameraOffset, float cameraZoom)
     {
-        var worldTopLeft = -cameraOffset;
-        var worldBottomRight = new Vector2(viewport.Width, viewport.Height) - cameraOffset;
+        var worldTopLeft = -cameraOffset / cameraZoom;
+        var worldBottomRight = (new Vector2(viewport.Width, viewport.Height) - cameraOffset) / cameraZoom;
         var minX = worldTopLeft.X;
         var minY = worldTopLeft.Y;
         var maxX = worldBottomRight.X;

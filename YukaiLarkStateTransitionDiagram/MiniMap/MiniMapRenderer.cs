@@ -23,6 +23,7 @@ public sealed class MiniMapRenderer
         IReadOnlyList<DiagramNode> nodes,
         Viewport viewport,
         Vector2 cameraOffset,
+        float cameraZoom,
         BoardTheme theme,
         bool dimmed = false,
         MiniMapLayout? layout = null)
@@ -32,7 +33,7 @@ public sealed class MiniMapRenderer
             return;
         }
 
-        layout ??= MiniMapLayout.Create(bounds, nodes, viewport, cameraOffset);
+        layout ??= MiniMapLayout.Create(bounds, nodes, viewport, cameraOffset, cameraZoom);
         var panelBackground = dimmed
             ? WithAlpha(Blend(theme.PanelBackgroundColor, Color.Gray, 0.62f), 184)
             : WithAlpha(Blend(theme.PanelBackgroundColor, theme.BackgroundColor, 0.48f), 238);
@@ -47,7 +48,7 @@ public sealed class MiniMapRenderer
             DrawNode(layout, node, theme, dimmed);
         }
 
-        var view = layout.GetViewportRectangle(viewport, cameraOffset);
+        var view = layout.GetViewportRectangle(viewport, cameraOffset, cameraZoom);
         DrawClampedOutline(bounds, view, dimmed ? new Color(74, 74, 74, 170) : new Color(24, 28, 32, 190), 3);
         DrawClampedOutline(bounds, view, dimmed ? new Color(172, 172, 172, 150) : WithAlpha(theme.SelectedTransitionLineColor, 232), 1);
     }

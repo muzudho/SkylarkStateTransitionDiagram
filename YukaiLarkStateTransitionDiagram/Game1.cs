@@ -37,6 +37,9 @@ public class Game1 : Game
     private const int MiniMapRightMargin = 12;
     private const int MiniMapBottomMargin = 64;
     private const int MaxFileNameLength = 255;
+    private const float MinCameraZoom = 0.25f;
+    private const float MaxCameraZoom = 3.0f;
+    private const float MouseWheelZoomFactor = 1.12f;
     private const string YukaiLarkMascotTexturePath = "Assets/BrandLogo/yukai-lark-logo.png";
     private static readonly Keys[] ThemeDigitKeys =
     [
@@ -106,6 +109,7 @@ public class Game1 : Game
     private DiagramDocument? _pendingHistorySnapshot;
     private Vector2 _dragOffset;
     private Vector2 _cameraOffset;
+    private float _cameraZoom = 1f;
     private Vector2 _panStartMouse;
     private Vector2 _panStartCamera;
     private bool _panMoved;
@@ -132,7 +136,7 @@ public class Game1 : Game
     private int _nextNodeId = 1;
     private string _status = DefaultStatus;
     private string _fileNameEditWarning = string.Empty;
-    private const string DefaultStatus = "N: 状態追加 / S: 開始マーク / T: テーマ選択 / Shift+ドラッグ: 遷移作成 / F2・Enter: ラベル編集 / Ctrl+Z/Y: 元に戻す/やり直し / Ctrl+S: 保存";
+    private const string DefaultStatus = "N: 状態追加 / S: 開始マーク / ホイール: 拡大縮小 / T: テーマ選択 / Shift+ドラッグ: 遷移作成 / F2・Enter: ラベル編集 / Ctrl+Z/Y: 元に戻す/やり直し / Ctrl+S: 保存";
     public Game1()
     {
         _graphics = new GraphicsDeviceManager(this)
@@ -354,9 +358,10 @@ public class Game1 : Game
         var maxX = float.MinValue;
         foreach (var node in _nodes)
         {
-            var screenPosition = node.Position + _cameraOffset;
-            minX = MathF.Min(minX, screenPosition.X - node.Radius);
-            maxX = MathF.Max(maxX, screenPosition.X + node.Radius);
+            var screenPosition = WorldToScreen(node.Position);
+            var screenRadius = node.Radius * _cameraZoom;
+            minX = MathF.Min(minX, screenPosition.X - screenRadius);
+            maxX = MathF.Max(maxX, screenPosition.X + screenRadius);
         }
 
         const float leftComfortPadding = 140f;
@@ -1430,7 +1435,7 @@ public class Game1 : Game
 
         void Include(Vector2 point)
         {
-            var screenPoint = point + _cameraOffset;
+            var screenPoint = WorldToScreen(point);
             if (!hasBounds)
             {
                 left = right = screenPoint.X;
@@ -1570,7 +1575,7 @@ public class Game1 : Game
     }
 
     private Vector2 SnapScreenToHalfGrid(Vector2 screenPosition)
-        => SnapToHalfGrid(ScreenToWorld(screenPosition)) + _cameraOffset;
+        => WorldToScreen(SnapToHalfGrid(ScreenToWorld(screenPosition)));
 
     private int SnapScreenX(int x)
         => (int)MathF.Round(SnapScreenToHalfGrid(new Vector2(x, 0)).X);
@@ -1671,7 +1676,7 @@ public class Game1 : Game
 
         var worldTopLeft = ScreenToWorld(new Vector2(selection.X, selection.Y));
         var worldBottomRight = ScreenToWorld(new Vector2(selection.Right, selection.Bottom));
-        var exportTransform = Matrix.CreateTranslation(-worldTopLeft.X + imageArea.X, -worldTopLeft.Y + imageArea.Y, 0f);
+        var exportTransform = Matrix.CreateScale(_cameraZoom) * Matrix.CreateTranslation(-worldTopLeft.X * _cameraZoom + imageArea.X, -worldTopLeft.Y * _cameraZoom + imageArea.Y, 0f);
         var previousScissor = GraphicsDevice.ScissorRectangle;
         using var scissorRasterizer = new RasterizerState { ScissorTestEnable = true };
         GraphicsDevice.ScissorRectangle = imageArea;
@@ -2022,6 +2027,10 @@ public class Game1 : Game
 
             return;
         }
+        if (TryHandleMouseWheelZoom(mouse))
+        {
+            return;
+        }
         if (leftPressed)
         {
             if (TryBeginMiniMapDrag(screenMousePosition))
@@ -2223,8 +2232,36 @@ public class Game1 : Game
             return;
         }
 
-        var layout = MiniMapLayout.Create(bounds, _nodes, GraphicsDevice.Viewport, _cameraOffset);
+        var layout = MiniMapLayout.Create(bounds, _nodes, GraphicsDevice.Viewport, _cameraOffset, _cameraZoom);
         CenterViewOnWorldPosition(layout.MapToWorld(screenMousePosition));
+    }
+
+    private bool TryHandleMouseWheelZoom(MouseState mouse)
+    {
+        var wheelDelta = mouse.ScrollWheelValue - _previousMouse.ScrollWheelValue;
+        if (wheelDelta == 0)
+        {
+            return false;
+        }
+
+        if (_draggedNode is not null
+            || _resizedNode is not null
+            || _draggedHandleTransition is not null
+            || _linkSource is not null
+            || _isPanning
+            || _isMiniMapDragging)
+        {
+            return false;
+        }
+
+        var screenPosition = mouse.Position.ToVector2();
+        var worldBeforeZoom = ScreenToWorld(screenPosition);
+        var wheelSteps = wheelDelta / 120f;
+        var zoomFactor = MathF.Pow(MouseWheelZoomFactor, wheelSteps);
+        _cameraZoom = MathHelper.Clamp(_cameraZoom * zoomFactor, MinCameraZoom, MaxCameraZoom);
+        _cameraOffset = screenPosition - worldBeforeZoom * _cameraZoom;
+        _status = $"表示倍率: {MathF.Round(_cameraZoom * 100f)}%。マウス位置を中心に拡大縮小しました。";
+        return true;
     }
 
     private void CaptureDraggedNodeTransitionSnapshots(DiagramNode node)
@@ -2433,7 +2470,7 @@ public class Game1 : Game
     {
         var viewport = GraphicsDevice.Viewport;
         var screenCenter = new Vector2(viewport.Width / 2f, viewport.Height / 2f);
-        _cameraOffset = screenCenter - worldPosition;
+        _cameraOffset = screenCenter - worldPosition * _cameraZoom;
         _isPanning = false;
     }
 
@@ -2697,6 +2734,7 @@ public class Game1 : Game
         _textBoxController.Clear();
         _pendingHistorySnapshot = null;
         _cameraOffset = Vector2.Zero;
+        _cameraZoom = 1f;
         _isPanning = false;
         _isExportSelecting = false;
         _exportSelectionDragging = false;
@@ -2939,9 +2977,11 @@ public class Game1 : Game
     }
     private DiagramNode? FindNode(int id) => _nodes.FirstOrDefault(n => n.Id == id);
     private Matrix GetViewMatrix()
-        => Matrix.CreateTranslation(_cameraOffset.X, _cameraOffset.Y, 0f);
+        => Matrix.CreateScale(_cameraZoom) * Matrix.CreateTranslation(_cameraOffset.X, _cameraOffset.Y, 0f);
     private Vector2 ScreenToWorld(Vector2 screenPosition)
-        => screenPosition - _cameraOffset;
+        => (screenPosition - _cameraOffset) / _cameraZoom;
+    private Vector2 WorldToScreen(Vector2 worldPosition)
+        => worldPosition * _cameraZoom + _cameraOffset;
     private static Vector2 SnapToHalfGrid(Vector2 position)
     {
         const float unit = DiagramNode.RadiusUnit;
@@ -3615,7 +3655,7 @@ public class Game1 : Game
 
         var dimmed = _yukaiLarkAssistant.CutInBandBounds != Rectangle.Empty
             && bounds.Intersects(_yukaiLarkAssistant.CutInBandBounds);
-        _miniMapRenderer.Draw(bounds, _nodes, GraphicsDevice.Viewport, _cameraOffset, _boardTheme, dimmed);
+        _miniMapRenderer.Draw(bounds, _nodes, GraphicsDevice.Viewport, _cameraOffset, _cameraZoom, _boardTheme, dimmed);
     }
 
     private static bool TryGetMiniMapBounds(Viewport viewport, out Rectangle bounds)
