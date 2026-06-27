@@ -37,7 +37,7 @@ public sealed class NodeRenderer
     /// <param name="selected">選択されているかどうか</param>
     /// <param name="editingNode">編集中のノード</param>
     /// <param name="editingLabel">編集中のラベル</param>
-    public void DrawNode(DiagramNode node, bool selected, DiagramNode? editingNode, string editingLabel, int editingCaretIndex, bool showEditingCaret, TimeSpan totalGameTime, bool inactive = false)
+    public void DrawNode(DiagramNode node, bool selected, DiagramNode? editingNode, string editingLabel, int editingCaretIndex, bool showEditingCaret, TimeSpan totalGameTime, bool inactive = false, bool hovered = false)
     {
         var baseFill = node.Kind == NodeKind.Normal && _palette.Length > 0
             ? _palette[node.ColorIndex % _palette.Length]
@@ -62,21 +62,22 @@ public sealed class NodeRenderer
             DrawSelectedNodeSweep(node, totalGameTime);
         }
 
+        var drawHoveredOutline = hovered && !inactive;
         // 通常ノード
         if (node.Kind == NodeKind.Normal)
         {
-            _primitiveRenderer.DrawCircleOutline(node.Position, node.Radius, normalOutlineColor, 3f);
+            DrawNodeOutlineCircle(node.Position, node.Radius, normalOutlineColor, 3f, drawHoveredOutline, totalGameTime);
         }
         // 開始マーク
         else if (node.Kind == NodeKind.StartMarker)
         {
-            _primitiveRenderer.DrawCircleOutline(node.Position, node.Radius - 1f, outlineColor, 5f);
+            DrawNodeOutlineCircle(node.Position, node.Radius - 1f, outlineColor, 5f, drawHoveredOutline, totalGameTime);
         }
         // 終了マーク
         else
         {
-            _primitiveRenderer.DrawCircleOutline(node.Position, node.Radius - 2f, outlineColor, 2f);
-            _primitiveRenderer.DrawCircleOutline(node.Position, node.Radius - 7f, outlineColor, 2f);
+            DrawNodeOutlineCircle(node.Position, node.Radius - 2f, outlineColor, 2f, drawHoveredOutline, totalGameTime);
+            DrawNodeOutlineCircle(node.Position, node.Radius - 7f, outlineColor, 2f, drawHoveredOutline, totalGameTime, 1.2f);
         }
 
         if (node == editingNode)
@@ -136,6 +137,38 @@ public sealed class NodeRenderer
         var center = GetNodeResizeHandleCenter(node);
         _primitiveRenderer.DrawLine(node.Position + new Vector2(node.Radius * 0.72f, node.Radius * 0.72f), center, new Color(255, 230, 120), 2f);
         _primitiveRenderer.DrawHandle(center, new Color(255, 230, 120));
+    }
+    private void DrawNodeOutlineCircle(Vector2 center, float radius, Color color, float thickness, bool hovered, TimeSpan totalGameTime, float amplitude = 2.1f)
+    {
+        if (hovered)
+        {
+            DrawWobblingCircle(center, radius, color, thickness, totalGameTime, amplitude);
+            return;
+        }
+
+        _primitiveRenderer.DrawCircleOutline(center, radius, color, thickness);
+    }
+
+    private void DrawWobblingCircle(Vector2 center, float radius, Color color, float thickness, TimeSpan totalGameTime, float amplitude)
+    {
+        const int segments = 96;
+        var phase = (float)totalGameTime.TotalSeconds * 18f;
+        var previous = GetWobblingCirclePoint(center, radius, 0f, phase, amplitude);
+
+        for (var i = 1; i <= segments; i++)
+        {
+            var angle = MathHelper.TwoPi * i / segments;
+            var current = GetWobblingCirclePoint(center, radius, angle, phase, amplitude);
+            _primitiveRenderer.DrawLine(previous, current, color, thickness);
+            previous = current;
+        }
+    }
+
+    private static Vector2 GetWobblingCirclePoint(Vector2 center, float radius, float angle, float phase, float amplitude)
+    {
+        var direction = new Vector2(MathF.Cos(angle), MathF.Sin(angle));
+        var wobble = MathF.Sin(phase + (angle * 5f)) * amplitude;
+        return center + (direction * (radius + wobble));
     }
 
     private void DrawSelectedNodeGlow(DiagramNode node, TimeSpan totalGameTime)

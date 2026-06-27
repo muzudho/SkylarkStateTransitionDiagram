@@ -2547,6 +2547,28 @@ public class Game1 : Game
             _primitiveRenderer.DrawLine(new Vector2(topLeft.X, y), new Vector2(bottomRight.X, y), color, 1f);
         }
     }
+
+    private DiagramNode? GetNodeHoverCueTarget()
+    {
+        if (IsEditingLabel || _isEditingFileName || _draggedNode is not null || _resizedNode is not null || _draggedHandleTransition is not null || _isPanning || _linkSource is not null)
+        {
+            return null;
+        }
+
+        var mouse = Mouse.GetState();
+        var mouseWorld = ScreenToWorld(mouse.Position.ToVector2());
+        var handle = FindTransitionHandleAt(mouseWorld);
+        if (handle.Transition is not null)
+        {
+            return null;
+        }
+
+        var node = FindNodeAt(mouseWorld);
+        return node is not null && node != _selectedNode
+            ? node
+            : null;
+    }
+
     private void DrawHoverCue(TimeSpan totalGameTime)
     {
         if (IsEditingLabel || _isEditingFileName || _draggedNode is not null || _resizedNode is not null || _draggedHandleTransition is not null || _isPanning || _linkSource is not null)
@@ -2577,10 +2599,6 @@ public class Game1 : Game
         var node = FindNodeAt(mouseWorld);
         if (node is not null)
         {
-            if (node != _selectedNode)
-            {
-                _primitiveRenderer.DrawCircleOutline(node.Position, node.Radius + 8f, new Color(130, 185, 230), 3f);
-            }
             return;
         }
 
@@ -2655,10 +2673,11 @@ public class Game1 : Game
             DrawStartMarkerGhost(totalGameTime);
             DrawStateNodeGhost(totalGameTime);
         }
+        var hoveredNode = includeInteraction ? GetNodeHoverCueTarget() : null;
         foreach (var node in _nodes)
         {
             var inactive = includeInteraction && IsInactiveDuringTransitionLink(node);
-            _nodeRenderer.DrawNode(node, includeInteraction && node == _selectedNode, _editingNode, editingDisplayLabel, editingDisplayCaretIndex, showEditingCaret, totalGameTime, inactive);
+            _nodeRenderer.DrawNode(node, includeInteraction && node == _selectedNode, _editingNode, editingDisplayLabel, editingDisplayCaretIndex, showEditingCaret, totalGameTime, inactive, node == hoveredNode);
         }
         if (includeInteraction && _selectedNode is not null && !IsInactiveDuringTransitionLink(_selectedNode))
         {
