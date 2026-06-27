@@ -181,29 +181,47 @@ internal sealed class YukaiLarkAssistant
     private static Rectangle GetMascotTarget(Viewport viewport, int targetHeight, float bob, Rectangle avoidBounds)
     {
         const int margin = 22;
-        const int panelGap = 56;
+        const int headerHeight = 58;
+        const int headerGap = 22;
+        const int avoidGap = 24;
+        var topMargin = headerHeight + headerGap;
         var bobOffset = (int)MathF.Round(bob);
-        var target = new Rectangle(viewport.Width - MascotTargetWidth - margin, 178 + bobOffset, MascotTargetWidth, targetHeight);
+        var target = new Rectangle(viewport.Width - MascotTargetWidth - margin, topMargin + bobOffset, MascotTargetWidth, targetHeight);
+        if (!IntersectsWithGap(target, avoidBounds, avoidGap))
+        {
+            return target;
+        }
+
+        target.Y = avoidBounds.Y - targetHeight - avoidGap + bobOffset;
+        if (target.Y >= topMargin && !IntersectsWithGap(target, avoidBounds, avoidGap))
+        {
+            return target;
+        }
+
+        target.X = avoidBounds.X - MascotTargetWidth - avoidGap;
+        target.Y = topMargin + bobOffset;
+        if (target.X >= margin)
+        {
+            return target;
+        }
+
+        target.X = margin;
+        return target;
+    }
+
+    private static bool IntersectsWithGap(Rectangle target, Rectangle avoidBounds, int gap)
+    {
         if (avoidBounds == Rectangle.Empty)
         {
-            return target;
+            return false;
         }
 
-        target.X = Math.Max(margin, avoidBounds.Right - MascotTargetWidth);
-        target.Y = avoidBounds.Y - targetHeight - panelGap + bobOffset;
-        if (target.Y >= margin)
-        {
-            return target;
-        }
-
-        target.Y = avoidBounds.Bottom + panelGap + bobOffset;
-        if (target.Bottom <= viewport.Height - margin)
-        {
-            return target;
-        }
-
-        target.Y = margin + bobOffset;
-        return target;
+        var expandedAvoidBounds = new Rectangle(
+            avoidBounds.X - gap,
+            avoidBounds.Y - gap,
+            avoidBounds.Width + gap * 2,
+            avoidBounds.Height + gap * 2);
+        return target.Intersects(expandedAvoidBounds);
     }
 
     private YukaiLarkAssistKind GetRunnableAssistKind(YukaiLarkAssistantContext context)

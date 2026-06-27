@@ -3569,7 +3569,17 @@ public class Game1 : Game
     }
 
     private Rectangle GetAssistantAvoidBounds(Viewport viewport)
-        => InspectorPanelRenderer.TryGetPanelBounds(viewport, out var bounds) ? bounds : Rectangle.Empty;
+    {
+        var hasInspectorBounds = InspectorPanelRenderer.TryGetPanelBounds(viewport, out var inspectorBounds);
+        var hasMiniMapBounds = TryGetMiniMapBounds(viewport, out var miniMapBounds);
+        return (hasInspectorBounds, hasMiniMapBounds) switch
+        {
+            (true, true) => Rectangle.Union(inspectorBounds, miniMapBounds),
+            (true, false) => inspectorBounds,
+            (false, true) => miniMapBounds,
+            _ => Rectangle.Empty
+        };
+    }
 
     private void DrawBottomShortcutHelp(GameTime gameTime)
     {

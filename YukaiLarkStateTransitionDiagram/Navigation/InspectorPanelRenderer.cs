@@ -14,7 +14,8 @@ public sealed class InspectorPanelRenderer : IDisposable
     private const int PanelWidth = 290;
     private const int PanelHeight = 70;
     private const int PanelRightMargin = 12;
-    private const int PanelMinimumTop = 70;
+    private const int PanelMinimumTop = 86;
+    private const int PanelBottomMargin = 194;
 
     private readonly GraphicsDevice _graphicsDevice;
     private readonly SpriteBatch _spriteBatch;
@@ -77,7 +78,7 @@ public sealed class InspectorPanelRenderer : IDisposable
     private static Rectangle GetPanelBounds(Viewport viewport)
     {
         var x = viewport.Width - PanelWidth - PanelRightMargin;
-        var y = Math.Max(PanelMinimumTop, (viewport.Height - PanelHeight) / 2);
+        var y = Math.Max(PanelMinimumTop, viewport.Height - PanelHeight - PanelBottomMargin);
         return new Rectangle(x, y, PanelWidth, PanelHeight);
     }
 
