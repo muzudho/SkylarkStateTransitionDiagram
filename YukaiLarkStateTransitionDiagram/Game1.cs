@@ -90,6 +90,7 @@ public class Game1 : Game
     private DiagramTransition? _editingTransition;
     private DiagramTransition? _draggedHandleTransition;
     private TransitionHandleKind _draggedHandleKind;
+    private readonly List<TransitionNodeDragSnapshot> _draggedNodeTransitionSnapshots = new();
     private DiagramNode? _resizedNode;
     private string? _currentFilePath;
     private DiagramDocument? _pendingHistorySnapshot;
@@ -1469,6 +1470,7 @@ public class Game1 : Game
             {
                 _draggedNode = node;
                 _dragOffset = mousePosition - node.Position;
+                CaptureDraggedNodeTransitionSnapshots(node);
                 BeginPendingHistory();
                 _status = "状態を選択しました。F2・Enterでラベル編集、Tで開始マーク切替。";
             }
@@ -1489,6 +1491,7 @@ public class Game1 : Game
         {
             var position = mousePosition - _dragOffset;
             _draggedNode.Position = snapNodes ? SnapToHalfGrid(position) : position;
+            UpdateDraggedNodeTransitions(_draggedNode);
         }
         if (_resizedNode is not null && mouse.LeftButton == ButtonState.Pressed)
         {
@@ -1537,6 +1540,7 @@ public class Game1 : Game
                 _status = $"状態サイズを{_resizedNode.RadiusUnits}単位にしました。Ctrl+Sで保存できます。";
             }
             _draggedNode = null;
+            _draggedNodeTransitionSnapshots.Clear();
             _resizedNode = null;
             _draggedHandleTransition = null;
             _draggedHandleKind = TransitionHandleKind.None;
@@ -1544,6 +1548,77 @@ public class Game1 : Game
             {
                 _isPanning = false;
                 _status = "表示位置を移動しました。空白をドラッグするとまた移動できます。";
+            }
+        }
+    }
+    private void CaptureDraggedNodeTransitionSnapshots(DiagramNode node)
+    {
+        _draggedNodeTransitionSnapshots.Clear();
+        foreach (var transition in _transitions.Where(t => t.SourceId == node.Id || t.TargetId == node.Id))
+        {
+            InitializeTransitionEndpoints(transition);
+            var source = FindNode(transition.SourceId);
+            var target = FindNode(transition.TargetId);
+            if (source is null || target is null)
+            {
+                continue;
+            }
+
+            TryGetTransitionGeometry(transition, out _, out var control1, out var control2, out _);
+            var selfLoop = transition.SourceId == transition.TargetId;
+            _draggedNodeTransitionSnapshots.Add(new TransitionNodeDragSnapshot(
+                transition,
+                source.Position,
+                target.Position,
+                transition.SourceAngle ?? 0f,
+                transition.TargetAngle ?? 0f,
+                selfLoop ? 0f : AngleFromTo(source.Position, target.Position),
+                selfLoop ? 0f : AngleFromTo(target.Position, source.Position),
+                transition.ControlPoint1.HasValue,
+                transition.ControlPoint2.HasValue,
+                control1 - source.Position,
+                control2 - target.Position));
+        }
+    }
+
+    private void UpdateDraggedNodeTransitions(DiagramNode draggedNode)
+    {
+        foreach (var snapshot in _draggedNodeTransitionSnapshots)
+        {
+            var source = FindNode(snapshot.Transition.SourceId);
+            var target = FindNode(snapshot.Transition.TargetId);
+            if (source is null || target is null)
+            {
+                continue;
+            }
+
+            if (snapshot.Transition.SourceId == snapshot.Transition.TargetId)
+            {
+                var delta = draggedNode.Position - snapshot.SourcePosition;
+                snapshot.Transition.SourceAngle = snapshot.SourceAngle;
+                snapshot.Transition.TargetAngle = snapshot.TargetAngle;
+                if (snapshot.HasControlPoint1)
+                {
+                    snapshot.Transition.ControlPoint1 = snapshot.SourcePosition + snapshot.ControlPoint1Offset + delta;
+                }
+                if (snapshot.HasControlPoint2)
+                {
+                    snapshot.Transition.ControlPoint2 = snapshot.TargetPosition + snapshot.ControlPoint2Offset + delta;
+                }
+                continue;
+            }
+
+            var sourceDelta = MathHelper.WrapAngle(AngleFromTo(source.Position, target.Position) - snapshot.SourceRelationAngle);
+            var targetDelta = MathHelper.WrapAngle(AngleFromTo(target.Position, source.Position) - snapshot.TargetRelationAngle);
+            snapshot.Transition.SourceAngle = MathHelper.WrapAngle(snapshot.SourceAngle + sourceDelta);
+            snapshot.Transition.TargetAngle = MathHelper.WrapAngle(snapshot.TargetAngle + targetDelta);
+            if (snapshot.HasControlPoint1)
+            {
+                snapshot.Transition.ControlPoint1 = source.Position + Rotate(snapshot.ControlPoint1Offset, sourceDelta);
+            }
+            if (snapshot.HasControlPoint2)
+            {
+                snapshot.Transition.ControlPoint2 = target.Position + Rotate(snapshot.ControlPoint2Offset, targetDelta);
             }
         }
     }
@@ -2175,6 +2250,13 @@ public class Game1 : Game
 
     private static float AngleFromTo(Vector2 from, Vector2 to)
         => MathF.Atan2(to.Y - from.Y, to.X - from.X);
+
+    private static Vector2 Rotate(Vector2 vector, float angle)
+    {
+        var cos = MathF.Cos(angle);
+        var sin = MathF.Sin(angle);
+        return new Vector2(vector.X * cos - vector.Y * sin, vector.X * sin + vector.Y * cos);
+    }
     private DiagramNode? FindNode(int id) => _nodes.FirstOrDefault(n => n.Id == id);
     private Matrix GetViewMatrix()
         => Matrix.CreateTranslation(_cameraOffset.X, _cameraOffset.Y, 0f);
@@ -3021,6 +3103,18 @@ public enum ExportSelectionDragMode
     BottomLeft,
     BottomRight
 }
+public sealed record TransitionNodeDragSnapshot(
+    DiagramTransition Transition,
+    Vector2 SourcePosition,
+    Vector2 TargetPosition,
+    float SourceAngle,
+    float TargetAngle,
+    float SourceRelationAngle,
+    float TargetRelationAngle,
+    bool HasControlPoint1,
+    bool HasControlPoint2,
+    Vector2 ControlPoint1Offset,
+    Vector2 ControlPoint2Offset);
 public sealed record TransitionHandleHit(DiagramTransition? Transition, TransitionHandleKind Kind);
 public enum TransitionHandleKind
 {
