@@ -1,6 +1,7 @@
 namespace YukaiLarkStateTransitionDiagram;
 
 using System;
+using System.Collections.Generic;
 using YukaiLarkStateTransitionDiagram.Theme;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -27,6 +28,65 @@ public sealed class EdgeRenderer
     /// テーマ
     /// </summary>
     public BoardTheme Theme { get; set; }
+
+
+    public void DrawTransitionPath(
+        DiagramTransition transition,
+        IReadOnlyList<Vector2> points,
+        bool selected,
+        bool editing,
+        string editingLabel,
+        int editingCaretIndex,
+        bool showEditingCaret,
+        bool drawStartMarkerFlowLine)
+    {
+        var lineColor = selected ? Theme.SelectedTransitionLineColor : Theme.TransitionLineColor;
+        var thickness = selected ? 4f : 3f;
+
+        if (selected)
+        {
+            DrawSelectedTransitionPathEffect(points);
+        }
+
+        if (drawStartMarkerFlowLine)
+        {
+            DrawDoublePathArrow(points, lineColor, selected);
+            return;
+        }
+
+        DrawPathArrow(points, lineColor, thickness);
+        DrawTransitionPathLabel(transition, points, selected, editing, editingLabel, editingCaretIndex, showEditingCaret);
+    }
+
+    public void DrawTransitionPathHandles(IReadOnlyList<Vector2> points)
+    {
+        if (points.Count < 2)
+        {
+            return;
+        }
+
+        _primitiveRenderer.DrawHandle(points[0], Theme.TransitionHandleColor);
+        _primitiveRenderer.DrawHandle(points[^1], Theme.TransitionHandleColor);
+        for (var i = 1; i < points.Count - 1; i++)
+        {
+            _primitiveRenderer.DrawCircle(points[i], 7.5f, Theme.TransitionControlHandleColor);
+            _primitiveRenderer.DrawCircleOutline(points[i], 10f, Theme.TransitionHandleColor, 2f);
+        }
+    }
+
+    public void DrawTransitionPathGhost(IReadOnlyList<Vector2> points, float opacity)
+    {
+        var alpha = MathHelper.Clamp(opacity, 0f, 1f);
+        DrawPathArrow(points, Theme.SelectedTransitionLineColor * (alpha * 0.68f), 5f);
+        DrawPathArrow(points, Theme.TransitionLineColor * (alpha * 0.42f), 3f);
+    }
+
+    public void DrawTransitionPathHoverCue(IReadOnlyList<Vector2> points, TimeSpan totalGameTime)
+    {
+        _ = totalGameTime;
+        DrawPathStroke(points, Theme.TransitionLineColor * 0.28f, 8f);
+        DrawPathStroke(points, Theme.TransitionLineColor * 0.9f, 4f);
+    }
 
     /// <summary>
     /// エッジを描く
@@ -136,6 +196,100 @@ public sealed class EdgeRenderer
     public void DrawLinkPreview(Vector2 start, Vector2 end)
     {
         DrawArrow(start, end, Theme.SelectedTransitionLineColor, 3f);
+    }
+
+
+    private void DrawTransitionPathLabel(
+        DiagramTransition transition,
+        IReadOnlyList<Vector2> points,
+        bool selected,
+        bool editing,
+        string editingLabel,
+        int editingCaretIndex,
+        bool showEditingCaret)
+    {
+        if (editing)
+        {
+            DrawTransitionPathEventEditor(transition, points, editingLabel, editingCaretIndex, showEditingCaret, 1f);
+            return;
+        }
+
+        var label = transition.Label;
+        if (string.IsNullOrWhiteSpace(label))
+        {
+            return;
+        }
+
+        var texture = _getLabelTexture(label, false);
+        var center = GetTransitionPathLabelCenter(points, transition, texture.Width, texture.Height);
+        var position = center - new Vector2(texture.Width / 2f, texture.Height / 2f);
+        DrawTransitionPathLabelLeader(transition, points, position, texture, selected ? 0.72f : 0.46f);
+        _spriteBatch.Draw(texture, position, Theme.TransitionLabelColor);
+        if (selected)
+        {
+            DrawSelectedTransitionLabelUnderline(position, texture, label);
+        }
+    }
+
+    private void DrawTransitionPathEventEditor(
+        DiagramTransition transition,
+        IReadOnlyList<Vector2> points,
+        string editingLabel,
+        int editingCaretIndex,
+        bool showCaret,
+        float opacity)
+    {
+        var isEmpty = string.IsNullOrEmpty(editingLabel);
+        var displayLabel = isEmpty ? "イベント名" : editingLabel;
+        var texture = _getLabelTexture(displayLabel, true);
+        var center = GetTransitionPathLabelCenter(points, transition, texture.Width, texture.Height);
+        var position = center - new Vector2(texture.Width / 2f, texture.Height / 2f);
+        var alpha = MathHelper.Clamp(opacity, 0f, 1f);
+        DrawTransitionPathLabelLeader(transition, points, position, texture, 0.58f * alpha);
+        var labelColor = isEmpty
+            ? Theme.SelectedTransitionLabelColor * (alpha * 0.62f)
+            : Theme.SelectedTransitionLabelColor * alpha;
+        _spriteBatch.Draw(texture, position, labelColor);
+
+        if (showCaret && alpha > 0f)
+        {
+            var caretLabel = isEmpty ? displayLabel : editingLabel;
+            var caretIndex = isEmpty ? 0 : Math.Clamp(editingCaretIndex, 0, caretLabel.Length);
+            DrawEditingCaret(position, texture, caretLabel, caretIndex, Theme.SelectedTransitionLabelColor * alpha);
+        }
+    }
+
+    private void DrawTransitionPathLabelLeader(DiagramTransition transition, IReadOnlyList<Vector2> points, Vector2 labelPosition, Texture2D texture, float opacity)
+    {
+        var anchor = GetTransitionPathPoint(points, MathHelper.Clamp(transition.LabelAnchorT, 0f, 1f));
+        var left = labelPosition.X;
+        var top = labelPosition.Y;
+        var right = labelPosition.X + texture.Width;
+        var bottom = labelPosition.Y + texture.Height;
+        var attach = new Vector2(MathHelper.Clamp(anchor.X, left, right), MathHelper.Clamp(anchor.Y, top, bottom));
+        if (Vector2.Distance(anchor, attach) <= 10f)
+        {
+            return;
+        }
+        _primitiveRenderer.DrawLine(anchor, attach, Theme.TransitionGuideColor * opacity, 1f);
+    }
+
+    public static Vector2 GetTransitionPathLabelCenter(IReadOnlyList<Vector2> points, DiagramTransition transition, int labelWidth, int labelHeight)
+    {
+        var anchorT = MathHelper.Clamp(transition.LabelAnchorT, 0f, 1f);
+        var anchor = GetTransitionPathPoint(points, anchorT);
+        if (transition.LabelOffset.HasValue)
+        {
+            return anchor + transition.LabelOffset.Value;
+        }
+
+        var tangent = GetTransitionPathTangent(points, anchorT);
+        var side = transition.LabelSide == 0 ? -1f : 1f;
+        if (MathF.Abs(tangent.X) >= MathF.Abs(tangent.Y))
+        {
+            return anchor + new Vector2(0, side * (labelHeight / 2f + 18f));
+        }
+        return anchor + new Vector2(side * (labelWidth / 2f + 22f), 0);
     }
 
     /// <summary>
@@ -445,6 +599,163 @@ public sealed class EdgeRenderer
             : Vector2.UnitY;
         var wobble = MathF.Sin(phase + (t * MathHelper.TwoPi * 3f)) * amplitude;
         return point + (normal * wobble);
+    }
+
+
+    private void DrawPathArrow(IReadOnlyList<Vector2> points, Color color, float thickness)
+    {
+        DrawPathStroke(points, color, thickness);
+        if (points.Count >= 2)
+        {
+            DrawArrowHead(points[^1], GetTransitionPathTangent(points, 1f), color, thickness);
+        }
+    }
+
+    private void DrawPathStroke(IReadOnlyList<Vector2> points, Color color, float thickness)
+    {
+        for (var i = 0; i < points.Count - 1; i++)
+        {
+            GetTransitionPathSegmentControlPoints(points, i, out var control1, out var control2);
+            DrawBezierStroke(points[i], control1, control2, points[i + 1], color, thickness);
+        }
+    }
+
+    private void DrawDoublePathArrow(IReadOnlyList<Vector2> points, Color color, bool selected)
+    {
+        const int segmentsPerPathSegment = 24;
+        var halfGap = selected ? 4.2f : 3.6f;
+        var lineThickness = selected ? 2.4f : 2f;
+        Vector2? previousLeft = null;
+        Vector2? previousRight = null;
+
+        for (var segment = 0; segment < points.Count - 1; segment++)
+        {
+            GetTransitionPathSegmentControlPoints(points, segment, out var control1, out var control2);
+            for (var i = 0; i <= segmentsPerPathSegment; i++)
+            {
+                var t = i / (float)segmentsPerPathSegment;
+                var point = CubicBezier(points[segment], control1, control2, points[segment + 1], t);
+                var tangent = CubicBezierTangent(points[segment], control1, control2, points[segment + 1], t);
+                if (tangent.LengthSquared() <= 0.01f)
+                {
+                    tangent = points[segment + 1] - points[segment];
+                }
+
+                var normal = tangent.LengthSquared() > 0.01f
+                    ? Vector2.Normalize(new Vector2(-tangent.Y, tangent.X))
+                    : Vector2.UnitY;
+                var left = point + normal * halfGap;
+                var right = point - normal * halfGap;
+
+                if (previousLeft.HasValue && previousRight.HasValue)
+                {
+                    _primitiveRenderer.DrawLine(previousLeft.Value, left, color, lineThickness);
+                    _primitiveRenderer.DrawLine(previousRight.Value, right, color, lineThickness);
+                }
+
+                previousLeft = left;
+                previousRight = right;
+            }
+        }
+
+        if (points.Count >= 2)
+        {
+            DrawArrowHead(points[^1], GetTransitionPathTangent(points, 1f), color, selected ? 4f : 3f);
+        }
+    }
+
+    private void DrawSelectedTransitionPathEffect(IReadOnlyList<Vector2> points)
+    {
+        DrawPathStroke(points, Theme.SelectedTransitionLineColor * 0.22f, 12f);
+        DrawPathStroke(points, Theme.SelectedTransitionLabelColor * 0.34f, 7f);
+        ReadOnlySpan<float> markerPositions = [0.22f, 0.5f, 0.78f];
+        foreach (var t in markerPositions)
+        {
+            var center = GetTransitionPathPoint(points, t);
+            _primitiveRenderer.DrawCircle(center, 5.5f, Theme.SelectedTransitionLabelColor * 0.72f);
+            _primitiveRenderer.DrawCircleOutline(center, 7.5f, Theme.SelectedTransitionLineColor * 0.78f, 2f);
+        }
+    }
+
+    private static Vector2 GetTransitionPathPoint(IReadOnlyList<Vector2> points, float t)
+    {
+        if (points.Count == 0) return Vector2.Zero;
+        if (points.Count == 1) return points[0];
+        var totalLength = GetTransitionPathLength(points);
+        if (totalLength <= 0f) return points[0];
+        var targetLength = MathHelper.Clamp(t, 0f, 1f) * totalLength;
+        var walked = 0f;
+        for (var i = 0; i < points.Count - 1; i++)
+        {
+            GetTransitionPathSegmentControlPoints(points, i, out var control1, out var control2);
+            var segmentLength = GetCubicBezierLength(points[i], control1, control2, points[i + 1]);
+            if (walked + segmentLength >= targetLength)
+            {
+                var segmentT = segmentLength <= 0f ? 0f : (targetLength - walked) / segmentLength;
+                return CubicBezier(points[i], control1, control2, points[i + 1], segmentT);
+            }
+            walked += segmentLength;
+        }
+        return points[^1];
+    }
+
+    private static Vector2 GetTransitionPathTangent(IReadOnlyList<Vector2> points, float t)
+    {
+        if (points.Count < 2) return Vector2.UnitX;
+        var totalLength = GetTransitionPathLength(points);
+        if (totalLength <= 0f) return points[^1] - points[0];
+        var targetLength = MathHelper.Clamp(t, 0f, 1f) * totalLength;
+        var walked = 0f;
+        for (var i = 0; i < points.Count - 1; i++)
+        {
+            GetTransitionPathSegmentControlPoints(points, i, out var control1, out var control2);
+            var segmentLength = GetCubicBezierLength(points[i], control1, control2, points[i + 1]);
+            if (walked + segmentLength >= targetLength)
+            {
+                var segmentT = segmentLength <= 0f ? 0f : (targetLength - walked) / segmentLength;
+                return CubicBezierTangent(points[i], control1, control2, points[i + 1], segmentT);
+            }
+            walked += segmentLength;
+        }
+        GetTransitionPathSegmentControlPoints(points, points.Count - 2, out var lastControl1, out var lastControl2);
+        return CubicBezierTangent(points[^2], lastControl1, lastControl2, points[^1], 1f);
+    }
+
+    private static float GetTransitionPathLength(IReadOnlyList<Vector2> points)
+    {
+        var length = 0f;
+        for (var i = 0; i < points.Count - 1; i++)
+        {
+            GetTransitionPathSegmentControlPoints(points, i, out var control1, out var control2);
+            length += GetCubicBezierLength(points[i], control1, control2, points[i + 1]);
+        }
+        return length;
+    }
+
+    private static void GetTransitionPathSegmentControlPoints(IReadOnlyList<Vector2> points, int segmentIndex, out Vector2 control1, out Vector2 control2)
+    {
+        var start = points[segmentIndex];
+        var end = points[segmentIndex + 1];
+        var previous = segmentIndex > 0 ? points[segmentIndex - 1] : start;
+        var next = segmentIndex + 2 < points.Count ? points[segmentIndex + 2] : end;
+        const float smoothness = 1f / 6f;
+        control1 = start + (end - previous) * smoothness;
+        control2 = end - (next - start) * smoothness;
+    }
+
+    private static float GetCubicBezierLength(Vector2 start, Vector2 control1, Vector2 control2, Vector2 end)
+    {
+        const int segments = 24;
+        var length = 0f;
+        var previous = start;
+        for (var i = 1; i <= segments; i++)
+        {
+            var t = i / (float)segments;
+            var current = CubicBezier(start, control1, control2, end, t);
+            length += Vector2.Distance(previous, current);
+            previous = current;
+        }
+        return length;
     }
 
     /// <summary>

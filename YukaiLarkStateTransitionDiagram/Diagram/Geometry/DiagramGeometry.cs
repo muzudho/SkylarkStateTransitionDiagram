@@ -1,6 +1,7 @@
 namespace YukaiLarkStateTransitionDiagram;
 
 using System;
+using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 
 public partial class Game1
@@ -21,11 +22,13 @@ public partial class Game1
             return;
         }
 
-        transition.SourceAngle ??= AngleFromTo(source.Position, target.Position);
-        transition.TargetAngle ??= AngleFromTo(target.Position, source.Position);
+        var firstWaypoint = transition.Waypoints.Count > 0 ? transition.Waypoints[0] : target.Position;
+        var lastWaypoint = transition.Waypoints.Count > 0 ? transition.Waypoints[^1] : source.Position;
+        transition.SourceAngle ??= AngleFromTo(source.Position, firstWaypoint);
+        transition.TargetAngle ??= AngleFromTo(target.Position, lastWaypoint);
     }
 
-    private void UpdateTransitionHandle(DiagramTransition transition, TransitionHandleKind kind, Vector2 mousePosition)
+    private void UpdateTransitionHandle(DiagramTransition transition, TransitionHandleKind kind, Vector2 mousePosition, int waypointIndex = -1)
     {
         switch (kind)
         {
@@ -41,7 +44,33 @@ public partial class Game1
             case TransitionHandleKind.ControlPoint2:
                 transition.ControlPoint2 = mousePosition;
                 break;
+            case TransitionHandleKind.Waypoint:
+                if (waypointIndex >= 0 && waypointIndex < transition.Waypoints.Count)
+                {
+                    transition.Waypoints[waypointIndex] = mousePosition;
+                    UpdateTransitionWaypointEndpointAngles(transition);
+                }
+                break;
         }
+    }
+
+
+    private void UpdateTransitionWaypointEndpointAngles(DiagramTransition transition)
+    {
+        if (transition.Waypoints.Count == 0)
+        {
+            return;
+        }
+
+        var source = FindNode(transition.SourceId);
+        var target = FindNode(transition.TargetId);
+        if (source is null || target is null)
+        {
+            return;
+        }
+
+        transition.SourceAngle = AngleFromTo(source.Position, transition.Waypoints[0]);
+        transition.TargetAngle = AngleFromTo(target.Position, transition.Waypoints[^1]);
     }
 
     private void UpdateTransitionEndpoint(DiagramTransition transition, bool isSource, Vector2 mousePosition)
@@ -81,8 +110,10 @@ public partial class Game1
             return false;
         }
 
-        var sourceAngle = transition.SourceAngle ?? AngleFromTo(source.Position, target.Position);
-        var targetAngle = transition.TargetAngle ?? AngleFromTo(target.Position, source.Position);
+        var firstWaypoint = transition.Waypoints.Count > 0 ? transition.Waypoints[0] : target.Position;
+        var lastWaypoint = transition.Waypoints.Count > 0 ? transition.Waypoints[^1] : source.Position;
+        var sourceAngle = transition.SourceAngle ?? AngleFromTo(source.Position, firstWaypoint);
+        var targetAngle = transition.TargetAngle ?? AngleFromTo(target.Position, lastWaypoint);
 
         // 頭
         start = PointOnCircle(source.Position, source.Radius, sourceAngle);
@@ -122,6 +153,171 @@ public partial class Game1
         control1 = transition.ControlPoint1 ?? start + delta / 3f;
         control2 = transition.ControlPoint2 ?? start + delta * 2f / 3f;
         return true;
+    }
+
+
+    private bool TryGetTransitionPath(DiagramTransition transition, out List<Vector2> points)
+    {
+        points = new List<Vector2>();
+        if (!TryGetTransitionEndpoints(transition, out var start, out var end))
+        {
+            return false;
+        }
+
+        points.Add(start);
+        points.AddRange(transition.Waypoints);
+        points.Add(end);
+        return true;
+    }
+
+    private static Vector2 GetTransitionPathPoint(IReadOnlyList<Vector2> points, float t)
+    {
+        if (points.Count == 0)
+        {
+            return Vector2.Zero;
+        }
+        if (points.Count == 1)
+        {
+            return points[0];
+        }
+
+        var totalLength = GetTransitionPathLength(points);
+        if (totalLength <= 0f)
+        {
+            return points[0];
+        }
+
+        var targetLength = MathHelper.Clamp(t, 0f, 1f) * totalLength;
+        var walked = 0f;
+        for (var i = 0; i < points.Count - 1; i++)
+        {
+            GetTransitionPathSegmentControlPoints(points, i, out var control1, out var control2);
+            var segmentLength = GetCubicBezierLength(points[i], control1, control2, points[i + 1]);
+            if (walked + segmentLength >= targetLength)
+            {
+                var segmentT = segmentLength <= 0f ? 0f : (targetLength - walked) / segmentLength;
+                return CubicBezier(points[i], control1, control2, points[i + 1], segmentT);
+            }
+            walked += segmentLength;
+        }
+
+        return points[^1];
+    }
+
+    private static Vector2 GetTransitionPathTangent(IReadOnlyList<Vector2> points, float t)
+    {
+        if (points.Count < 2)
+        {
+            return Vector2.UnitX;
+        }
+
+        var totalLength = GetTransitionPathLength(points);
+        if (totalLength <= 0f)
+        {
+            return points[^1] - points[0];
+        }
+
+        var targetLength = MathHelper.Clamp(t, 0f, 1f) * totalLength;
+        var walked = 0f;
+        for (var i = 0; i < points.Count - 1; i++)
+        {
+            GetTransitionPathSegmentControlPoints(points, i, out var control1, out var control2);
+            var segmentLength = GetCubicBezierLength(points[i], control1, control2, points[i + 1]);
+            if (walked + segmentLength >= targetLength)
+            {
+                var segmentT = segmentLength <= 0f ? 0f : (targetLength - walked) / segmentLength;
+                return CubicBezierTangent(points[i], control1, control2, points[i + 1], segmentT);
+            }
+            walked += segmentLength;
+        }
+
+        GetTransitionPathSegmentControlPoints(points, points.Count - 2, out var lastControl1, out var lastControl2);
+        return CubicBezierTangent(points[^2], lastControl1, lastControl2, points[^1], 1f);
+    }
+
+    private static float GetTransitionPathLength(IReadOnlyList<Vector2> points)
+    {
+        var length = 0f;
+        for (var i = 0; i < points.Count - 1; i++)
+        {
+            GetTransitionPathSegmentControlPoints(points, i, out var control1, out var control2);
+            length += GetCubicBezierLength(points[i], control1, control2, points[i + 1]);
+        }
+        return length;
+    }
+
+    private static float FindNearestTransitionPathT(Vector2 point, IReadOnlyList<Vector2> points)
+    {
+        var totalLength = GetTransitionPathLength(points);
+        if (totalLength <= 0f)
+        {
+            return 0f;
+        }
+
+        const int samplesPerSegment = 24;
+        var walked = 0f;
+        var bestT = 0f;
+        var bestDistance = float.MaxValue;
+        for (var i = 0; i < points.Count - 1; i++)
+        {
+            GetTransitionPathSegmentControlPoints(points, i, out var control1, out var control2);
+            var previous = points[i];
+            var segmentWalked = 0f;
+            for (var sample = 1; sample <= samplesPerSegment; sample++)
+            {
+                var localT = sample / (float)samplesPerSegment;
+                var current = CubicBezier(points[i], control1, control2, points[i + 1], localT);
+                var segmentLength = Vector2.Distance(previous, current);
+                var distance = DistanceToSegment(point, previous, current);
+                if (distance < bestDistance)
+                {
+                    bestDistance = distance;
+                    bestT = (walked + segmentWalked + (segmentLength * 0.5f)) / totalLength;
+                }
+                segmentWalked += segmentLength;
+                previous = current;
+            }
+            walked += segmentWalked;
+        }
+
+        return MathHelper.Clamp(bestT, 0f, 1f);
+    }
+
+    private static float DistanceToTransitionPath(Vector2 point, IReadOnlyList<Vector2> points)
+    {
+        var best = float.MaxValue;
+        for (var i = 0; i < points.Count - 1; i++)
+        {
+            GetTransitionPathSegmentControlPoints(points, i, out var control1, out var control2);
+            best = MathF.Min(best, DistanceToBezier(point, points[i], control1, control2, points[i + 1]));
+        }
+        return best;
+    }
+
+    private static void GetTransitionPathSegmentControlPoints(IReadOnlyList<Vector2> points, int segmentIndex, out Vector2 control1, out Vector2 control2)
+    {
+        var start = points[segmentIndex];
+        var end = points[segmentIndex + 1];
+        var previous = segmentIndex > 0 ? points[segmentIndex - 1] : start;
+        var next = segmentIndex + 2 < points.Count ? points[segmentIndex + 2] : end;
+        const float smoothness = 1f / 6f;
+        control1 = start + (end - previous) * smoothness;
+        control2 = end - (next - start) * smoothness;
+    }
+
+    private static float GetCubicBezierLength(Vector2 start, Vector2 control1, Vector2 control2, Vector2 end)
+    {
+        const int segments = 24;
+        var length = 0f;
+        var previous = start;
+        for (var i = 1; i <= segments; i++)
+        {
+            var t = i / (float)segments;
+            var current = CubicBezier(start, control1, control2, end, t);
+            length += Vector2.Distance(previous, current);
+            previous = current;
+        }
+        return length;
     }
 
     private static Vector2 PointOnCircle(Vector2 center, float radius, float angle)

@@ -139,6 +139,9 @@ public partial class Game1
         _draggedHandleTransition = null;
         _draggedHandleKind = TransitionHandleKind.None;
         _draggedLabelTransition = null;
+        _selectedWaypointTransition = null;
+        _selectedWaypointIndex = -1;
+        _linkWaypoints.Clear();
         _resizedNode = null;
         _textBoxController.Clear();
         _isPanning = false;
@@ -185,7 +188,8 @@ public partial class Game1
             SourceAngle = transition.SourceAngle,
             TargetAngle = transition.TargetAngle,
             ControlPoint1 = transition.ControlPoint1,
-            ControlPoint2 = transition.ControlPoint2
+            ControlPoint2 = transition.ControlPoint2,
+            Waypoints = transition.Waypoints.ToList()
         };
 
     private static AssistSuggestionSuppression CloneAssistSuggestionSuppression(AssistSuggestionSuppression suppression)

@@ -143,7 +143,10 @@ public partial class Game1
         }
         if (IsNewKeyPress(keyboard, Keys.Delete) || IsNewKeyPress(keyboard, Keys.Back))
         {
-            DeleteSelection();
+            if (!TryDeleteSelectedWaypoint())
+            {
+                DeleteSelection();
+            }
         }
         if (IsNewKeyPress(keyboard, Keys.C) && _selectedNode is not null)
         {

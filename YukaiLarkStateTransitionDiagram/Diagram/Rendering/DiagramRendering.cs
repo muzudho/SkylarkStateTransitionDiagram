@@ -1,6 +1,7 @@
 namespace YukaiLarkStateTransitionDiagram;
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using YukaiLarkStateTransitionDiagram.Assistants;
 using Microsoft.Xna.Framework;
@@ -84,6 +85,7 @@ public partial class Game1
                 TransitionHandleKind.TargetEndpoint => end,
                 TransitionHandleKind.ControlPoint1 => control1,
                 TransitionHandleKind.ControlPoint2 => control2,
+                TransitionHandleKind.Waypoint when handle.WaypointIndex >= 0 && handle.WaypointIndex < handle.Transition.Waypoints.Count => handle.Transition.Waypoints[handle.WaypointIndex],
                 _ => Vector2.Zero
             };
             if (center != Vector2.Zero)
@@ -100,9 +102,16 @@ public partial class Game1
         }
 
         var transition = FindTransitionAt(mouseWorld);
-        if (transition is not null && transition != _selectedTransition && TryGetTransitionGeometry(transition, out start, out control1, out control2, out end))
+        if (transition is not null && transition != _selectedTransition)
         {
-            _edgeRenderer.DrawTransitionHoverCue(start, control1, control2, end, totalGameTime);
+            if (transition.Waypoints.Count > 0 && TryGetTransitionPath(transition, out var points))
+            {
+                _edgeRenderer.DrawTransitionPathHoverCue(points, totalGameTime);
+            }
+            else if (TryGetTransitionGeometry(transition, out start, out control1, out control2, out end))
+            {
+                _edgeRenderer.DrawTransitionHoverCue(start, control1, control2, end, totalGameTime);
+            }
         }
     }
 
@@ -126,18 +135,33 @@ public partial class Game1
 
         foreach (var transition in _transitions)
         {
-            if (TryGetTransitionGeometry(transition, out var start, out var control1, out var control2, out var end))
+            var displayTransition = CanTransitionHaveEvent(transition)
+                ? transition
+                : new DiagramTransition
+                {
+                    SourceId = transition.SourceId,
+                    TargetId = transition.TargetId,
+                    LabelSide = transition.LabelSide,
+                    LabelAnchorT = transition.LabelAnchorT,
+                    LabelOffset = transition.LabelOffset,
+                    ControlPoint1 = transition.ControlPoint1,
+                    ControlPoint2 = transition.ControlPoint2,
+                    Waypoints = transition.Waypoints.ToList()
+                };
+            if (transition.Waypoints.Count > 0 && TryGetTransitionPath(transition, out var points))
             {
-                var displayTransition = CanTransitionHaveEvent(transition)
-                    ? transition
-                    : new DiagramTransition
-                    {
-                        SourceId = transition.SourceId,
-                        TargetId = transition.TargetId,
-                        LabelSide = transition.LabelSide,
-                        ControlPoint1 = transition.ControlPoint1,
-                        ControlPoint2 = transition.ControlPoint2
-                    };
+                _edgeRenderer.DrawTransitionPath(
+                    displayTransition,
+                    points,
+                    includeInteraction && transition == _selectedTransition,
+                    transition == _editingTransition,
+                    editingDisplayLabel,
+                    editingDisplayCaretIndex,
+                    showEditingCaret,
+                    !CanTransitionHaveEvent(transition));
+            }
+            else if (TryGetTransitionGeometry(transition, out var start, out var control1, out var control2, out var end))
+            {
                 _edgeRenderer.DrawTransition(
                     displayTransition,
                     start,
@@ -162,7 +186,18 @@ public partial class Game1
             if (_linkSource is not null)
             {
                 var mouse = Mouse.GetState();
-                _edgeRenderer.DrawLinkPreview(_linkSource.Position, ScreenToWorld(mouse.Position.ToVector2()));
+                var mouseWorld = ScreenToWorld(mouse.Position.ToVector2());
+                var previewPoints = new List<Vector2> { _linkSource.Position };
+                previewPoints.AddRange(_linkWaypoints);
+                previewPoints.Add(mouseWorld);
+                if (previewPoints.Count > 2)
+                {
+                    _edgeRenderer.DrawTransitionPathGhost(previewPoints, 0.9f);
+                }
+                else
+                {
+                    _edgeRenderer.DrawLinkPreview(_linkSource.Position, mouseWorld);
+                }
             }
         }
         if (includeInteraction)
@@ -182,7 +217,11 @@ public partial class Game1
         }
         if (includeInteraction && _selectedTransition is not null)
         {
-            if (TryGetTransitionGeometry(_selectedTransition, out var start, out var control1, out var control2, out var end))
+            if (_selectedTransition.Waypoints.Count > 0 && TryGetTransitionPath(_selectedTransition, out var points))
+            {
+                _edgeRenderer.DrawTransitionPathHandles(points);
+            }
+            else if (TryGetTransitionGeometry(_selectedTransition, out var start, out var control1, out var control2, out var end))
             {
                 _edgeRenderer.DrawTransitionHandles(start, control1, control2, end);
             }

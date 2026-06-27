@@ -17,6 +17,9 @@ public partial class Game1
     private DiagramNode? _draggedNode;
     private DiagramTransition? _draggedHandleTransition;
     private TransitionHandleKind _draggedHandleKind;
+    private int _draggedWaypointIndex = -1;
+    private DiagramTransition? _selectedWaypointTransition;
+    private int _selectedWaypointIndex = -1;
     private DiagramTransition? _draggedLabelTransition;
     private Vector2 _labelDragOffset;
     private Vector2 _labelDragStartMouse;
@@ -30,6 +33,7 @@ public partial class Game1
     private MouseCursor? _currentMouseCursor;
     private bool _isMiniMapDragging;
     private bool _isPanning;
+    private readonly List<Vector2> _linkWaypoints = new();
 
     private void HandleMouse(KeyboardState keyboard, MouseState mouse)
     {
@@ -62,6 +66,14 @@ public partial class Game1
         }
         if (leftPressed)
         {
+            if (_linkSource is not null && !shiftDown)
+            {
+                if (TryContinueTransitionLink(mousePosition))
+                {
+                    return;
+                }
+            }
+
             if (TryBeginMiniMapDrag(screenMousePosition))
             {
                 return;
@@ -85,6 +97,11 @@ public partial class Game1
             }
 
             _isPanning = false;
+            if (shiftDown && TryAddWaypointToExistingTransition(mousePosition))
+            {
+                return;
+            }
+
             _resizedNode = FindNodeResizeHandleAt(mousePosition);
             if (_resizedNode is not null)
             {
@@ -107,11 +124,17 @@ public partial class Game1
                 _draggedNode = null;
                 _draggedHandleTransition = handle.Transition;
                 _draggedHandleKind = handle.Kind;
+                _draggedWaypointIndex = handle.WaypointIndex;
+                _selectedWaypointTransition = handle.Kind == TransitionHandleKind.Waypoint ? handle.Transition : null;
+                _selectedWaypointIndex = handle.Kind == TransitionHandleKind.Waypoint ? handle.WaypointIndex : -1;
                 BeginPendingHistory();
-                UpdateTransitionHandle(handle.Transition, handle.Kind, mousePosition);
-                _status = handle.Kind is TransitionHandleKind.SourceEndpoint or TransitionHandleKind.TargetEndpoint
-                    ? "遷移の接点を円周上で移動中です。"
-                    : "遷移の曲がり方を調整中です。";
+                UpdateTransitionHandle(handle.Transition, handle.Kind, mousePosition, handle.WaypointIndex);
+                _status = handle.Kind switch
+                {
+                    TransitionHandleKind.SourceEndpoint or TransitionHandleKind.TargetEndpoint => "遷移の接点を円周上で移動中です。",
+                    TransitionHandleKind.Waypoint => "遷移の中間点を移動中です。Deleteで削除できます。",
+                    _ => "遷移の曲がり方を調整中です。"
+                };
                 return;
             }
 
@@ -128,6 +151,8 @@ public partial class Game1
             {
                 _selectedNode = node;
                 _selectedTransition = transition;
+                _selectedWaypointTransition = null;
+                _selectedWaypointIndex = -1;
             }
             if (transition is not null)
             {
@@ -140,6 +165,7 @@ public partial class Game1
                 if (!CanStartTransitionFrom(node))
                 {
                     _linkSource = null;
+                    _linkWaypoints.Clear();
                     _invalidLinkSource = node;
                     _status = GetCannotStartTransitionStatus(node);
                     return;
@@ -147,7 +173,8 @@ public partial class Game1
 
                 _invalidLinkSource = null;
                 _linkSource = node;
-                _status = "遷移を作成中です。接続先の状態でマウスを離してください。";
+                _linkWaypoints.Clear();
+                _status = "遷移を作成中です。空白クリックで中間点、接続先でクリックまたはマウスを離すと確定します。";
                 return;
             }
             if (node is not null)
@@ -165,6 +192,7 @@ public partial class Game1
                 _panStartMouse = screenMousePosition;
                 _panStartCamera = _cameraOffset;
                 _linkSource = null;
+                _linkWaypoints.Clear();
                 _status = "表示位置を移動中です。マウスを離すと停止します。";
             }
         }
@@ -178,7 +206,7 @@ public partial class Game1
         }
         if (_draggedHandleTransition is not null && mouse.LeftButton == ButtonState.Pressed)
         {
-            UpdateTransitionHandle(_draggedHandleTransition, _draggedHandleKind, mousePosition);
+            UpdateTransitionHandle(_draggedHandleTransition, _draggedHandleKind, mousePosition, _draggedWaypointIndex);
         }
         if (_draggedNode is not null && mouse.LeftButton == ButtonState.Pressed)
         {
@@ -200,10 +228,10 @@ public partial class Game1
             if (_linkSource is not null)
             {
                 var target = FindNodeAt(mousePosition);
-                if (target is not null)
+                if (target is not null && (target != _linkSource || _linkWaypoints.Count > 0))
                 {
                     var transitionCount = _transitions.Count;
-                    AddTransition(_linkSource.Id, target.Id);
+                    AddTransition(_linkSource.Id, target.Id, _linkWaypoints);
                     if (_transitions.Count > transitionCount)
                     {
                         _selectedNode = null;
@@ -213,7 +241,11 @@ public partial class Game1
                             : "開始マークから最初の状態へ入る遷移を作成しました。この遷移にはイベントを付けられません。";
                     }
                 }
-                _linkSource = null;
+                if (target is not null && (target != _linkSource || _linkWaypoints.Count > 0))
+                {
+                    _linkSource = null;
+                    _linkWaypoints.Clear();
+                }
             }
             _invalidLinkSource = null;
             if (_draggedLabelTransition is not null)
@@ -245,6 +277,7 @@ public partial class Game1
             _resizedNode = null;
             _draggedHandleTransition = null;
             _draggedHandleKind = TransitionHandleKind.None;
+            _draggedWaypointIndex = -1;
             _draggedLabelTransition = null;
             if (_isPanning)
             {
@@ -286,6 +319,118 @@ public partial class Game1
 
         var layout = MiniMapLayout.Create(bounds, _nodes, GraphicsDevice.Viewport, _cameraOffset, _cameraZoom);
         CenterViewOnWorldPosition(layout.MapToWorld(screenMousePosition));
+    }
+
+
+    private bool TryAddWaypointToExistingTransition(Vector2 mousePosition)
+    {
+        var transition = _selectedTransition;
+        if (transition is null || FindNodeAt(mousePosition) is not null)
+        {
+            return false;
+        }
+
+        const float hitDistance = 12f;
+        var waypoint = SnapToHalfGrid(mousePosition);
+        var insertIndex = 0;
+
+        if (transition.Waypoints.Count > 0)
+        {
+            if (!TryGetTransitionPath(transition, out var points) || DistanceToTransitionPath(mousePosition, points) > hitDistance)
+            {
+                return false;
+            }
+            insertIndex = FindNearestTransitionPathInsertIndex(mousePosition, points);
+        }
+        else
+        {
+            if (!TryGetTransitionGeometry(transition, out var start, out var control1, out var control2, out var end)
+                || DistanceToBezier(mousePosition, start, control1, control2, end) > hitDistance)
+            {
+                return false;
+            }
+        }
+
+        ExecuteUndoableChange(() =>
+        {
+            transition.Waypoints.Insert(insertIndex, waypoint);
+            UpdateTransitionWaypointEndpointAngles(transition);
+        });
+        _selectedNode = null;
+        _selectedTransition = transition;
+        _selectedWaypointTransition = transition;
+        _selectedWaypointIndex = insertIndex;
+        _status = "選択中の遷移に中間点を追加しました。中間点はドラッグ移動、Deleteで削除できます。";
+        return true;
+    }
+
+    private static int FindNearestTransitionPathInsertIndex(Vector2 point, IReadOnlyList<Vector2> points)
+    {
+        var bestSegmentIndex = 0;
+        var bestDistance = float.MaxValue;
+        for (var i = 0; i < points.Count - 1; i++)
+        {
+            GetTransitionPathSegmentControlPoints(points, i, out var control1, out var control2);
+            var distance = DistanceToBezier(point, points[i], control1, control2, points[i + 1]);
+            if (distance < bestDistance)
+            {
+                bestDistance = distance;
+                bestSegmentIndex = i;
+            }
+        }
+
+        return Math.Clamp(bestSegmentIndex, 0, Math.Max(0, points.Count - 2));
+    }
+
+    private bool TryContinueTransitionLink(Vector2 mousePosition)
+    {
+        var target = FindNodeAt(mousePosition);
+        if (target is not null)
+        {
+            if (target == _linkSource && _linkWaypoints.Count == 0)
+            {
+                _status = "空白クリックで中間点を追加するか、別の状態をクリックして遷移を確定してください。";
+                return true;
+            }
+
+            var transitionCount = _transitions.Count;
+            AddTransition(_linkSource!.Id, target.Id, _linkWaypoints);
+            if (_transitions.Count > transitionCount)
+            {
+                _selectedNode = null;
+                _selectedTransition = _transitions.LastOrDefault();
+                _status = _selectedTransition is not null && CanTransitionHaveEvent(_selectedTransition)
+                    ? "中間点つきの遷移を作成しました。中間点はドラッグ移動、Deleteで削除できます。"
+                    : "開始マークから最初の状態へ入る遷移を作成しました。この遷移にはイベントを付けられません。";
+            }
+            _linkSource = null;
+            _linkWaypoints.Clear();
+            return true;
+        }
+
+        _linkWaypoints.Add(SnapToHalfGrid(mousePosition));
+        _status = $"遷移の中間点を追加しました（{_linkWaypoints.Count}個）。接続先の状態をクリックすると確定します。";
+        return true;
+    }
+
+    private bool TryDeleteSelectedWaypoint()
+    {
+        if (_selectedWaypointTransition is null
+            || _selectedWaypointIndex < 0
+            || _selectedWaypointIndex >= _selectedWaypointTransition.Waypoints.Count)
+        {
+            return false;
+        }
+
+        var transition = _selectedWaypointTransition;
+        var index = _selectedWaypointIndex;
+        ExecuteUndoableChange(() => transition.Waypoints.RemoveAt(index));
+        _selectedWaypointTransition = null;
+        _selectedWaypointIndex = -1;
+        _selectedTransition = transition;
+        _selectedNode = null;
+        _status = "遷移の中間点を削除しました。Ctrl+Sで保存できます。";
+        return true;
     }
 
     private bool TryHandleMouseWheelZoom(MouseState mouse)
@@ -343,7 +488,8 @@ public partial class Game1
                 transition.ControlPoint1.HasValue,
                 transition.ControlPoint2.HasValue,
                 control1 - source.Position,
-                control2 - target.Position));
+                control2 - target.Position,
+                transition.Waypoints.Select(waypoint => waypoint - node.Position).ToList()));
         }
     }
 
@@ -371,6 +517,10 @@ public partial class Game1
                 {
                     snapshot.Transition.ControlPoint2 = snapshot.TargetPosition + snapshot.ControlPoint2Offset + delta;
                 }
+                for (var i = 0; i < snapshot.Transition.Waypoints.Count && i < snapshot.WaypointOffsets.Count; i++)
+                {
+                    snapshot.Transition.Waypoints[i] = draggedNode.Position + snapshot.WaypointOffsets[i];
+                }
                 continue;
             }
 
@@ -385,6 +535,10 @@ public partial class Game1
             if (snapshot.HasControlPoint2)
             {
                 snapshot.Transition.ControlPoint2 = target.Position + Rotate(snapshot.ControlPoint2Offset, targetDelta);
+            }
+            if (snapshot.Transition.SourceId == draggedNode.Id && snapshot.Transition.TargetId == draggedNode.Id)
+            {
+                continue;
             }
         }
     }
@@ -504,14 +658,29 @@ public partial class Game1
     {
         topLeft = Vector2.Zero;
         size = Vector2.Zero;
-        if (string.IsNullOrWhiteSpace(transition.Label)
-            || !TryGetTransitionGeometry(transition, out var start, out var control1, out var control2, out var end))
+        if (string.IsNullOrWhiteSpace(transition.Label))
         {
             return false;
         }
 
         var texture = GetLabelTexture(transition.Label, false);
-        var center = EdgeRenderer.GetTransitionLabelCenter(start, control1, control2, end, transition, texture.Width, texture.Height);
+        Vector2 center;
+        if (transition.Waypoints.Count > 0)
+        {
+            if (!TryGetTransitionPath(transition, out var points))
+            {
+                return false;
+            }
+            center = GetTransitionPathLabelCenter(points, transition, texture.Width, texture.Height);
+        }
+        else
+        {
+            if (!TryGetTransitionGeometry(transition, out var start, out var control1, out var control2, out var end))
+            {
+                return false;
+            }
+            center = EdgeRenderer.GetTransitionLabelCenter(start, control1, control2, end, transition, texture.Width, texture.Height);
+        }
         size = new Vector2(texture.Width, texture.Height);
         topLeft = center - size / 2f;
         return true;
@@ -539,13 +708,26 @@ public partial class Game1
 
     private void UpdateTransitionLabelPlacement(DiagramTransition transition, Vector2 labelCenter)
     {
-        if (!TryGetTransitionGeometry(transition, out var start, out var control1, out var control2, out var end))
+        float anchorT;
+        Vector2 anchor;
+        if (transition.Waypoints.Count > 0)
         {
-            return;
+            if (!TryGetTransitionPath(transition, out var points))
+            {
+                return;
+            }
+            anchorT = FindNearestTransitionPathT(labelCenter, points);
+            anchor = GetTransitionPathPoint(points, anchorT);
         }
-
-        var anchorT = FindNearestTransitionT(labelCenter, start, control1, control2, end);
-        var anchor = EdgeRenderer.GetTransitionPoint(start, control1, control2, end, anchorT);
+        else
+        {
+            if (!TryGetTransitionGeometry(transition, out var start, out var control1, out var control2, out var end))
+            {
+                return;
+            }
+            anchorT = FindNearestTransitionT(labelCenter, start, control1, control2, end);
+            anchor = EdgeRenderer.GetTransitionPoint(start, control1, control2, end, anchorT);
+        }
         transition.LabelAnchorT = anchorT;
         transition.LabelOffset = labelCenter - anchor;
     }
@@ -554,12 +736,17 @@ public partial class Game1
     {
         foreach (var transition in _transitions)
         {
-            if (!TryGetTransitionGeometry(transition, out var start, out var control1, out var control2, out var end))
+            if (transition.Waypoints.Count > 0)
             {
+                if (TryGetTransitionPath(transition, out var points) && DistanceToTransitionPath(position, points) <= 8f)
+                {
+                    return transition;
+                }
                 continue;
             }
 
-            if (DistanceToBezier(position, start, control1, control2, end) <= 8f)
+            if (TryGetTransitionGeometry(transition, out var start, out var control1, out var control2, out var end)
+                && DistanceToBezier(position, start, control1, control2, end) <= 8f)
             {
                 return transition;
             }
@@ -593,6 +780,15 @@ public partial class Game1
             return false;
         }
 
+        for (var i = 0; i < transition.Waypoints.Count; i++)
+        {
+            if (Vector2.Distance(position, transition.Waypoints[i]) <= 14f)
+            {
+                hit = new TransitionHandleHit(transition, TransitionHandleKind.Waypoint, i);
+                return true;
+            }
+        }
+
         if (Vector2.Distance(position, start) <= 14f)
         {
             hit = new TransitionHandleHit(transition, TransitionHandleKind.SourceEndpoint);
@@ -603,6 +799,11 @@ public partial class Game1
         {
             hit = new TransitionHandleHit(transition, TransitionHandleKind.TargetEndpoint);
             return true;
+        }
+
+        if (transition.Waypoints.Count > 0)
+        {
+            return false;
         }
 
         if (Vector2.Distance(position, control1) <= 14f)
@@ -619,4 +820,24 @@ public partial class Game1
 
         return false;
     }
+    private static Vector2 GetTransitionPathLabelCenter(IReadOnlyList<Vector2> points, DiagramTransition transition, int labelWidth, int labelHeight)
+    {
+        var anchorT = MathHelper.Clamp(transition.LabelAnchorT, 0f, 1f);
+        var anchor = GetTransitionPathPoint(points, anchorT);
+        if (transition.LabelOffset.HasValue)
+        {
+            return anchor + transition.LabelOffset.Value;
+        }
+
+        var tangent = GetTransitionPathTangent(points, anchorT);
+        var side = transition.LabelSide == 0 ? -1f : 1f;
+        if (MathF.Abs(tangent.X) >= MathF.Abs(tangent.Y))
+        {
+            return anchor + new Vector2(0, side * (labelHeight / 2f + 18f));
+        }
+
+        return anchor + new Vector2(side * (labelWidth / 2f + 22f), 0);
+    }
+
 }
+

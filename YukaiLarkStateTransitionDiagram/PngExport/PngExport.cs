@@ -200,6 +200,10 @@ public partial class Game1
             Include(start);
             Include(control1);
             Include(control2);
+            foreach (var waypoint in transition.Waypoints)
+            {
+                Include(waypoint);
+            }
             Include(end);
             if (TryGetTransitionLabelBounds(transition, out var labelTopLeft, out var labelSize))
             {

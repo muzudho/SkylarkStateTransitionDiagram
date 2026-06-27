@@ -1,5 +1,6 @@
 namespace YukaiLarkStateTransitionDiagram;
 
+using System.Collections.Generic;
 using System.Linq;
 using YukaiLarkStateTransitionDiagram.Assistants;
 using Microsoft.Xna.Framework;
@@ -92,7 +93,7 @@ public partial class Game1
         _isPanning = false;
     }
 
-    private void AddTransition(int sourceId, int targetId)
+    private void AddTransition(int sourceId, int targetId, IReadOnlyList<Vector2>? waypoints = null)
     {
         var source = FindNode(sourceId);
         var target = FindNode(targetId);
@@ -121,7 +122,12 @@ public partial class Game1
         }
         ExecuteUndoableChange(() =>
         {
-            var transition = new DiagramTransition { SourceId = sourceId, TargetId = targetId };
+            var transition = new DiagramTransition
+            {
+                SourceId = sourceId,
+                TargetId = targetId,
+                Waypoints = waypoints?.ToList() ?? new List<Vector2>()
+            };
             InitializeTransitionEndpoints(transition);
             if (!CanTransitionHaveEvent(transition))
             {

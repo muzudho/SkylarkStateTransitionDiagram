@@ -531,6 +531,7 @@ public sealed class DiagramTransition
     public float? TargetAngle { get; set; }
     public Vector2? ControlPoint1 { get; set; }
     public Vector2? ControlPoint2 { get; set; }
+    public List<Vector2> Waypoints { get; set; } = new();
 }
 public sealed record TransitionNodeDragSnapshot(
     DiagramTransition Transition,
@@ -543,15 +544,17 @@ public sealed record TransitionNodeDragSnapshot(
     bool HasControlPoint1,
     bool HasControlPoint2,
     Vector2 ControlPoint1Offset,
-    Vector2 ControlPoint2Offset);
-public sealed record TransitionHandleHit(DiagramTransition? Transition, TransitionHandleKind Kind);
+    Vector2 ControlPoint2Offset,
+    List<Vector2> WaypointOffsets);
+public sealed record TransitionHandleHit(DiagramTransition? Transition, TransitionHandleKind Kind, int WaypointIndex = -1);
 public enum TransitionHandleKind
 {
     None,
     SourceEndpoint,
     TargetEndpoint,
     ControlPoint1,
-    ControlPoint2
+    ControlPoint2,
+    Waypoint
 }
 public static class PrimitiveText
 {
