@@ -30,6 +30,7 @@ public class Game1 : Game
     private const float ExportFlashDurationSeconds = 0.18f;
     private const float ExportPhotoPreviewDurationSeconds = 1.35f;
     private const int RecentFileMenuMaxItems = AppConfig.MaxRecentFiles;
+    private const int ThemeMenuPageSize = 10;
     private const int MaxFileNameLength = 255;
     private const string YukaiLarkMascotTexturePath = "Assets/BrandLogo/yukai-lark-logo.png";
     private static readonly Keys[] ThemeDigitKeys =
@@ -107,6 +108,7 @@ public class Game1 : Game
     private bool _isFileMenuOpen;
     private bool _isStartupFileMenu;
     private bool _isThemeMenuOpen;
+    private int _themeMenuPage;
     private bool _isEditingFileName;
     private bool _exportSelectionDragging;
     private bool _hasExportSelection;
@@ -242,19 +244,19 @@ public class Game1 : Game
         DrawYukaiLarkMascot(GraphicsDevice.Viewport, gameTime.TotalGameTime);
 
         DrawInspectorPanel();
-        _shortcutKeyRenderer.DrawBottomHelp(
-            GraphicsDevice.Viewport,
-            gameTime.TotalGameTime,
-            IsEditingLabel,
-            _isExportSelecting,
-            _hasExportSelection,
-            _nodes.Any(node => node.Kind == NodeKind.StartMarker),
-            _selectedNode,
-            _selectedTransition);
+        if (!_isThemeMenuOpen)
+        {
+            DrawBottomShortcutHelp(gameTime);
+        }
+
         DrawExportSelectionOverlay();
         DrawExportPhotoEffectOverlay();
         DrawThemeMenuOverlay();
         DrawFileMenuOverlay();
+        if (_isThemeMenuOpen)
+        {
+            DrawBottomShortcutHelp(gameTime);
+        }
         _spriteBatch.End();
         base.Draw(gameTime);
     }
@@ -667,7 +669,8 @@ public class Game1 : Game
     private void OpenThemeMenu()
     {
         _isThemeMenuOpen = true;
-        _status = "テーマを選んでください。クリック、または0-9で切り替え。Esc/Tで閉じます。";
+        _themeMenuPage = GetThemePageForIndex(GetCurrentThemeIndex());
+        _status = "テーマを選んでください。クリックや0-9で切り替え、Escまたは閉じるボタンで閉じます。";
     }
 
     private void CloseThemeMenu()
@@ -677,17 +680,29 @@ public class Game1 : Game
 
     private void HandleThemeMenuKeyboard(KeyboardState keyboard)
     {
-        if (IsNewKeyPress(keyboard, Keys.Escape) || IsNewKeyPress(keyboard, Keys.T))
+        if (IsNewKeyPress(keyboard, Keys.Escape))
         {
             CloseThemeMenu();
             _status = "テーマ選択を閉じました。";
             return;
         }
 
+        if (IsNewKeyPress(keyboard, Keys.PageUp))
+        {
+            MoveThemeMenuPage(-1);
+            return;
+        }
+
+        if (IsNewKeyPress(keyboard, Keys.PageDown))
+        {
+            MoveThemeMenuPage(1);
+            return;
+        }
+
         if (TryGetThemeShortcutIndex(keyboard, out var themeIndex))
         {
             ApplyKeyCapTheme(themeIndex);
-            CloseThemeMenu();
+            _themeMenuPage = GetThemePageForIndex(themeIndex);
         }
     }
 
@@ -699,19 +714,21 @@ public class Game1 : Game
         }
 
         var point = mouse.Position;
-        if (!GetThemeMenuPanelRectangle().Contains(point))
+        if (GetThemeMenuCloseButtonRectangle().Contains(point))
         {
             CloseThemeMenu();
             _status = "テーマ選択を閉じました。";
             return;
         }
 
-        for (var i = 0; i < KeyCapThemes.ShortcutThemes.Count; i++)
+        var startIndex = GetThemeMenuVisibleStartIndex();
+        var visibleCount = GetThemeMenuVisibleItemCount();
+        for (var visibleIndex = 0; visibleIndex < visibleCount; visibleIndex++)
         {
-            if (GetThemeMenuItemRectangle(i).Contains(point))
+            var themeIndex = startIndex + visibleIndex;
+            if (GetThemeMenuItemRectangle(visibleIndex).Contains(point))
             {
-                ApplyKeyCapTheme(i);
-                CloseThemeMenu();
+                ApplyKeyCapTheme(themeIndex);
                 return;
             }
         }
@@ -726,10 +743,15 @@ public class Game1 : Game
         }
 
         var label = $"テーマ: {_keyCapTheme.Name}";
-        _spriteBatch.Draw(_pixel, bounds, new Color(255, 255, 255, 30));
-        DrawScreenRectangleOutline(bounds, _boardTheme.HeaderBorderColor, 1);
-        DrawUiText("T", new Vector2(bounds.X + 8, bounds.Y + 6), _boardTheme.HeaderTitleTextColor, 13, true);
-        DrawUiText(label, new Vector2(bounds.X + 32, bounds.Y + 5), _boardTheme.HeaderTitleTextColor, 14, true);
+        _spriteBatch.Draw(_pixel, bounds, WithAlpha(_keyCapTheme.FaceColor, 236));
+        _spriteBatch.Draw(_pixel, new Rectangle(bounds.X, bounds.Y, bounds.Width, 1), WithAlpha(_keyCapTheme.TopEdgeColor, 245));
+        _spriteBatch.Draw(_pixel, new Rectangle(bounds.X, bounds.Y, 1, bounds.Height), WithAlpha(_keyCapTheme.TopEdgeColor, 245));
+        _spriteBatch.Draw(_pixel, new Rectangle(bounds.X, bounds.Bottom - 2, bounds.Width, 2), WithAlpha(_keyCapTheme.BottomEdgeColor, 245));
+        _spriteBatch.Draw(_pixel, new Rectangle(bounds.Right - 1, bounds.Y, 1, bounds.Height), WithAlpha(_keyCapTheme.BottomEdgeColor, 245));
+        _spriteBatch.Draw(_pixel, new Rectangle(bounds.X + 2, bounds.Y + 2, bounds.Width - 4, 1), WithAlpha(_keyCapTheme.InnerHighlightColor, 210));
+        DrawScreenRectangleOutline(bounds, WithAlpha(_boardTheme.HeaderBorderColor, 210), 1);
+        DrawUiText("T", new Vector2(bounds.X + 8, bounds.Y + 6), _keyCapTheme.LabelTextColor, 13, true);
+        DrawUiText(label, new Vector2(bounds.X + 32, bounds.Y + 5), _keyCapTheme.LabelTextColor, 14, true);
     }
 
     private Rectangle GetThemeButtonRectangle(Viewport viewport)
@@ -752,66 +774,119 @@ public class Game1 : Game
         }
 
         var viewport = GraphicsDevice.Viewport;
-        _spriteBatch.Draw(_pixel, new Rectangle(0, 0, viewport.Width, viewport.Height), new Color(18, 26, 28, 150));
+        _spriteBatch.Draw(_pixel, new Rectangle(0, 0, viewport.Width, viewport.Height), WithAlpha(Blend(_boardTheme.BackgroundColor, Color.Black, 0.42f), 150));
 
         var panel = GetThemeMenuPanelRectangle();
-        _spriteBatch.Draw(_pixel, new Rectangle(panel.X + 6, panel.Y + 8, panel.Width, panel.Height), new Color(16, 22, 24, 105));
-        _spriteBatch.Draw(_pixel, panel, new Color(255, 253, 239, 245));
-        DrawScreenRectangleOutline(panel, new Color(83, 178, 176), 2);
+        _spriteBatch.Draw(_pixel, new Rectangle(panel.X + 6, panel.Y + 8, panel.Width, panel.Height), WithAlpha(Blend(_boardTheme.BackgroundColor, Color.Black, 0.42f), 115));
+        _spriteBatch.Draw(_pixel, panel, WithAlpha(_boardTheme.PanelBackgroundColor, 246));
+        DrawScreenRectangleOutline(panel, WithAlpha(_boardTheme.PanelTopEdgeColor, 235), 2);
 
-        DrawUiText("テーマ選択", new Vector2(panel.X + 24, panel.Y + 22), new Color(38, 55, 62), 24, true);
-        DrawUiText("クリック、または0-9キーで切り替えます。", new Vector2(panel.X + 24, panel.Y + 58), new Color(88, 105, 112), 15, false);
+        DrawUiText("テーマ選択", new Vector2(panel.X + 24, panel.Y + 20), _boardTheme.PanelPrimaryTextColor, 24, true);
+        DrawUiText("クリックや0-9キーで切り替えます。後ろの画面で見た目を確認できます。", new Vector2(panel.X + 24, panel.Y + 56), _boardTheme.PanelSecondaryTextColor, 15, false);
+        DrawThemeMenuCloseButton();
 
-        for (var i = 0; i < KeyCapThemes.ShortcutThemes.Count; i++)
+        var pageCount = GetThemeMenuPageCount();
+        var pageText = $"{_themeMenuPage + 1}/{pageCount}";
+        var pageTexture = GetUiTextTexture(pageText, 14, true);
+        DrawUiText(pageText, new Vector2(panel.Right - pageTexture.Width - 24, panel.Y + 64), _boardTheme.PanelMutedTextColor, 14, true);
+
+        var startIndex = GetThemeMenuVisibleStartIndex();
+        var visibleCount = GetThemeMenuVisibleItemCount();
+        for (var visibleIndex = 0; visibleIndex < visibleCount; visibleIndex++)
         {
-            DrawThemeMenuItem(i);
+            DrawThemeMenuItem(startIndex + visibleIndex, visibleIndex);
         }
     }
 
-    private void DrawThemeMenuItem(int index)
+    private void DrawThemeMenuCloseButton()
     {
-        var theme = KeyCapThemes.ShortcutThemes[index];
-        var bounds = GetThemeMenuItemRectangle(index);
+        var bounds = GetThemeMenuCloseButtonRectangle();
+        _spriteBatch.Draw(_pixel, bounds, WithAlpha(_keyCapTheme.FaceColor, 228));
+        DrawScreenRectangleOutline(bounds, WithAlpha(_keyCapTheme.BottomEdgeColor, 232), 1);
+        DrawUiText("閉じる", new Vector2(bounds.X + 16, bounds.Y + 7), _keyCapTheme.LabelTextColor, 14, true);
+    }
+
+    private void DrawThemeMenuItem(int themeIndex, int visibleIndex)
+    {
+        var theme = KeyCapThemes.ShortcutThemes[themeIndex];
+        var bounds = GetThemeMenuItemRectangle(visibleIndex);
         var selected = ReferenceEquals(theme, _keyCapTheme);
-        var fill = selected ? new Color(229, 249, 244, 255) : index % 2 == 0 ? new Color(250, 252, 246, 245) : new Color(238, 250, 239, 245);
-        var edge = selected ? new Color(83, 178, 176) : new Color(178, 219, 203);
+        var themeBoard = BoardThemes.ForKeyCapTheme(theme);
+        var fill = selected ? WithAlpha(theme.FaceColor, 238) : WithAlpha(Blend(themeBoard.PanelBackgroundColor, theme.FaceColor, 0.18f), 232);
+        var edge = selected ? theme.BottomEdgeColor : WithAlpha(theme.BottomEdgeColor, 190);
 
         _spriteBatch.Draw(_pixel, bounds, fill);
         DrawScreenRectangleOutline(bounds, edge, selected ? 2 : 1);
-        _spriteBatch.Draw(_pixel, new Rectangle(bounds.X + 12, bounds.Y + 12, 28, 22), theme.FaceColor);
-        DrawScreenRectangleOutline(new Rectangle(bounds.X + 12, bounds.Y + 12, 28, 22), theme.BottomEdgeColor, 1);
+        _spriteBatch.Draw(_pixel, new Rectangle(bounds.X + 12, bounds.Y + 10, 34, 24), theme.FaceColor);
+        DrawScreenRectangleOutline(new Rectangle(bounds.X + 12, bounds.Y + 10, 34, 24), theme.BottomEdgeColor, 1);
 
-        var shortcut = index.ToString();
-        DrawUiText(shortcut, new Vector2(bounds.X + 52, bounds.Y + 13), new Color(51, 84, 102), 16, true);
-        DrawUiText(theme.Name, new Vector2(bounds.X + 82, bounds.Y + 12), new Color(38, 55, 62), 17, true);
+        var shortcut = themeIndex.ToString();
+        DrawUiText(shortcut, new Vector2(bounds.X + 58, bounds.Y + 12), theme.LabelTextColor, 16, true);
+        DrawUiText(theme.Name, new Vector2(bounds.X + 92, bounds.Y + 11), themeBoard.PanelPrimaryTextColor, 17, true);
         if (selected)
         {
-            DrawUiText("選択中", new Vector2(bounds.Right - 72, bounds.Y + 14), new Color(38, 119, 118), 14, true);
+            DrawUiText("選択中", new Vector2(bounds.Right - 78, bounds.Y + 13), themeBoard.PanelPrimaryTextColor, 14, true);
         }
     }
 
     private Rectangle GetThemeMenuPanelRectangle()
     {
         var viewport = GraphicsDevice.Viewport;
-        var width = Math.Clamp(viewport.Width - 64, 560, 760);
-        var itemCount = KeyCapThemes.ShortcutThemes.Count;
-        var rows = (int)MathF.Ceiling(itemCount / 2f);
-        var height = Math.Min(viewport.Height - 64, 112 + rows * 54);
+        var width = Math.Clamp(viewport.Width - 64, 520, 680);
+        var visibleCount = GetThemeMenuVisibleItemCount();
+        var height = Math.Min(viewport.Height - 64, 132 + visibleCount * 48);
         var x = (viewport.Width - width) / 2;
         var y = Math.Max(24, (viewport.Height - height) / 2);
         return new Rectangle(x, y, width, height);
     }
 
-    private Rectangle GetThemeMenuItemRectangle(int index)
+    private Rectangle GetThemeMenuItemRectangle(int visibleIndex)
     {
         var panel = GetThemeMenuPanelRectangle();
-        var column = index % 2;
-        var row = index / 2;
-        var gap = 12;
-        var itemWidth = (panel.Width - 48 - gap) / 2;
-        var x = panel.X + 24 + column * (itemWidth + gap);
-        var y = panel.Y + 94 + row * 54;
-        return new Rectangle(x, y, itemWidth, 46);
+        var x = panel.X + 24;
+        var y = panel.Y + 92 + visibleIndex * 48;
+        return new Rectangle(x, y, panel.Width - 48, 40);
+    }
+
+    private Rectangle GetThemeMenuCloseButtonRectangle()
+    {
+        var panel = GetThemeMenuPanelRectangle();
+        return new Rectangle(panel.Right - 102, panel.Y + 20, 78, 30);
+    }
+
+    private int GetThemeMenuVisibleStartIndex()
+        => Math.Min(_themeMenuPage * ThemeMenuPageSize, Math.Max(0, KeyCapThemes.ShortcutThemes.Count - 1));
+
+    private int GetThemeMenuVisibleItemCount()
+    {
+        var startIndex = GetThemeMenuVisibleStartIndex();
+        return Math.Min(ThemeMenuPageSize, KeyCapThemes.ShortcutThemes.Count - startIndex);
+    }
+
+    private int GetThemeMenuPageCount()
+        => Math.Max(1, (int)MathF.Ceiling(KeyCapThemes.ShortcutThemes.Count / (float)ThemeMenuPageSize));
+
+    private int GetThemePageForIndex(int themeIndex)
+        => Math.Clamp(themeIndex, 0, Math.Max(0, KeyCapThemes.ShortcutThemes.Count - 1)) / ThemeMenuPageSize;
+
+    private int GetCurrentThemeIndex()
+    {
+        for (var i = 0; i < KeyCapThemes.ShortcutThemes.Count; i++)
+        {
+            if (ReferenceEquals(KeyCapThemes.ShortcutThemes[i], _keyCapTheme))
+            {
+                return i;
+            }
+        }
+
+        return 0;
+    }
+
+    private void MoveThemeMenuPage(int delta)
+    {
+        var pageCount = GetThemeMenuPageCount();
+        _themeMenuPage = (_themeMenuPage + delta + pageCount) % pageCount;
+        _status = $"テーマ表ページ {_themeMenuPage + 1}/{pageCount} を表示しています。";
     }
     private void DrawFileMenuOverlay()
     {
@@ -3336,6 +3411,19 @@ public class Game1 : Game
             DrawUiText);
     }
 
+    private void DrawBottomShortcutHelp(GameTime gameTime)
+    {
+        _shortcutKeyRenderer.DrawBottomHelp(
+            GraphicsDevice.Viewport,
+            gameTime.TotalGameTime,
+            IsEditingLabel,
+            _isExportSelecting,
+            _isThemeMenuOpen,
+            _hasExportSelection,
+            _nodes.Any(node => node.Kind == NodeKind.StartMarker),
+            _selectedNode,
+            _selectedTransition);
+    }
     private void DrawInspectorPanel()
     {
         _inspectorPanelRenderer.DrawInspectorPanel(
@@ -3457,6 +3545,18 @@ public class Game1 : Game
     private void DrawText(string text, Vector2 position, Color color, int scale)
     {
         PrimitiveText.Draw(_spriteBatch, _pixel, text, position, color, scale);
+    }
+    private static Color WithAlpha(Color color, byte alpha)
+        => new(color.R, color.G, color.B, alpha);
+
+    private static Color Blend(Color from, Color to, float amount)
+    {
+        var clamped = MathHelper.Clamp(amount, 0f, 1f);
+        return new Color(
+            (byte)MathF.Round(MathHelper.Lerp(from.R, to.R, clamped)),
+            (byte)MathF.Round(MathHelper.Lerp(from.G, to.G, clamped)),
+            (byte)MathF.Round(MathHelper.Lerp(from.B, to.B, clamped)),
+            (byte)MathF.Round(MathHelper.Lerp(from.A, to.A, clamped)));
     }
     private bool IsNewKeyPress(KeyboardState keyboard, Keys key)
         => keyboard.IsKeyDown(key) && !_previousKeyboard.IsKeyDown(key);

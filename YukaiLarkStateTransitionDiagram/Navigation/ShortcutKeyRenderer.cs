@@ -62,6 +62,7 @@ public sealed class ShortcutKeyRenderer : IDisposable
     /// <param name="totalGameTime">ゲーム開始からの経過時間</param>
     /// <param name="isEditingLabel">ラベル編集中かどうか</param>
     /// <param name="isExportSelecting">エクスポート選択中かどうか</param>
+    /// <param name="isThemeMenuOpen">テーマ選択中かどうか</param>
     /// <param name="hasExportSelection">エクスポート範囲が作成済みかどうか</param>
     /// <param name="hasStartMarker">開始マークが存在するかどうか</param>
     /// <param name="selectedNode">選択されているノード</param>
@@ -71,6 +72,7 @@ public sealed class ShortcutKeyRenderer : IDisposable
         TimeSpan totalGameTime,
         bool isEditingLabel,
         bool isExportSelecting,
+        bool isThemeMenuOpen,
         bool hasExportSelection,
         bool hasStartMarker,
         DiagramNode? selectedNode,
@@ -84,7 +86,7 @@ public sealed class ShortcutKeyRenderer : IDisposable
         var y = viewport.Height - 34;
         _spriteBatch.Draw(_pixel, new Rectangle(0, y, viewport.Width, 34), _boardTheme.BottomBarBackgroundColor);
 
-        var pages = GetHelpPages(isEditingLabel, isExportSelecting, hasExportSelection, hasStartMarker, selectedNode, selectedTransition);
+        var pages = GetHelpPages(isEditingLabel, isExportSelecting, isThemeMenuOpen, hasExportSelection, hasStartMarker, selectedNode, selectedTransition);
         if (pages.Length == 0)
         {
             return;
@@ -156,6 +158,7 @@ public sealed class ShortcutKeyRenderer : IDisposable
     private static HelpPage[] GetHelpPages(
         bool isEditingLabel,
         bool isExportSelecting,
+        bool isThemeMenuOpen,
         bool hasExportSelection,
         bool hasStartMarker,
         DiagramNode? selectedNode,
@@ -164,6 +167,22 @@ public sealed class ShortcutKeyRenderer : IDisposable
         var startMarkerHint = hasStartMarker
             ? new HelpHint("S", "開始へ移動")
             : new HelpHint("S", "開始マーク追加");
+
+        if (isThemeMenuOpen)
+        {
+            return
+            [
+                new HelpPage
+                (
+                    [
+                        new HelpHint("0-9", "お気に入りテーマ"),
+                        new HelpHint("PageUp/PageDown", "テーマ表ページ切替"),
+                        new HelpHint("クリック", "プレビュー切替"),
+                        new HelpHint("Esc", "閉じる")
+                    ]
+                )
+            ];
+        }
 
         if (isExportSelecting)
         {
