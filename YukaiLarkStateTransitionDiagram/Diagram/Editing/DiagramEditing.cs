@@ -115,7 +115,7 @@ public partial class Game1
             return;
         }
 
-        if (_transitions.Any(t => t.SourceId == sourceId && t.TargetId == targetId))
+        if (HasTransition(sourceId, targetId))
         {
             _status = "同じ向きの遷移は既にあります。";
             return;
@@ -177,8 +177,13 @@ public partial class Game1
             return node == _invalidLinkSource;
         }
 
-        return _linkSource is not null && node != _linkSource && !CanEndTransitionAt(node);
+        return _linkSource is not null
+            && node != _linkSource
+            && (!CanEndTransitionAt(node) || HasTransition(_linkSource.Id, node.Id));
     }
+
+    private bool HasTransition(int sourceId, int targetId)
+        => _transitions.Any(t => t.SourceId == sourceId && t.TargetId == targetId);
 
     private bool CanTransitionHaveEvent(DiagramTransition transition)
     {
