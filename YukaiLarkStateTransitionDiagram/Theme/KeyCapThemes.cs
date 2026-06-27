@@ -22,6 +22,12 @@ public static class KeyCapThemes
     public static IKeyCapTheme PastelColors { get; } = new PastelColorsKeyCapTheme();
     public static IKeyCapTheme Beach { get; } = new BeachKeyCapTheme();
     public static IKeyCapTheme Roma { get; } = new RomaKeyCapTheme();
+    public static IKeyCapTheme Tropical { get; } = new TropicalKeyCapTheme();
+    public static IKeyCapTheme Forest { get; } = new ForestKeyCapTheme();
+    public static IKeyCapTheme Desert { get; } = new DesertKeyCapTheme();
+    public static IKeyCapTheme Snow { get; } = new SnowKeyCapTheme();
+    public static IKeyCapTheme Rainy { get; } = new RainyKeyCapTheme();
+    public static IKeyCapTheme NightSky { get; } = new NightSkyKeyCapTheme();
 
     public static IReadOnlyList<IKeyCapTheme> AllThemes { get; } =
     [
@@ -40,7 +46,13 @@ public static class KeyCapThemes
         Midnight,
         PastelColors,
         Beach,
-        Roma
+        Roma,
+        Tropical,
+        Forest,
+        Desert,
+        Snow,
+        Rainy,
+        NightSky
     ];
 
     public static IReadOnlyList<IKeyCapTheme> ShortcutThemes { get; } =
@@ -58,8 +70,15 @@ public static class KeyCapThemes
         Midnight,
         PastelColors,
         Beach,
-        Roma
+        Roma,
+        Tropical,
+        Forest,
+        Desert,
+        Snow,
+        Rainy,
+        NightSky
     ];
 }
+
 
 
