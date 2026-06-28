@@ -147,17 +147,22 @@ public sealed class NodeRenderer
     public void DrawNodeSnapIndicator(DiagramNode node, TimeSpan totalGameTime)
     {
         var pulse = 0.5f + (MathF.Sin((float)totalGameTime.TotalSeconds * 7.2f) * 0.5f);
+        var indicatorColor = GetNodeSnapIndicatorColor(node);
+
+        _primitiveRenderer.DrawCircle(node.Position, 9f, Theme.HandleOutlineColor * MathHelper.Lerp(0.42f, 0.58f, pulse));
+        _primitiveRenderer.DrawCircle(node.Position, 6f, indicatorColor * MathHelper.Lerp(0.82f, 1f, pulse));
+        _primitiveRenderer.DrawCircleOutline(node.Position, 8f, Theme.PhotoPaperColor * MathHelper.Lerp(0.72f, 0.92f, pulse), 2f);
+    }
+
+    public Color GetNodeSnapIndicatorColor(DiagramNode node)
+    {
         var fill = node.Kind switch
         {
             NodeKind.Normal => GetNormalNodeFillColor(node),
             NodeKind.StartMarker => Theme.StartMarkerFillColor,
             _ => Theme.EndMarkerFillColor
         };
-        var indicatorColor = Blend(fill, Theme.SelectedTransitionLineColor, 0.44f);
-
-        _primitiveRenderer.DrawCircle(node.Position, 9f, Theme.HandleOutlineColor * MathHelper.Lerp(0.42f, 0.58f, pulse));
-        _primitiveRenderer.DrawCircle(node.Position, 6f, indicatorColor * MathHelper.Lerp(0.82f, 1f, pulse));
-        _primitiveRenderer.DrawCircleOutline(node.Position, 8f, Theme.PhotoPaperColor * MathHelper.Lerp(0.72f, 0.92f, pulse), 2f);
+        return Blend(fill, Theme.SelectedTransitionLineColor, 0.44f);
     }
 
     private void DrawNodeOutlineCircle(Vector2 center, float radius, Color color, float thickness, bool hovered, TimeSpan totalGameTime, float amplitude = 2.1f)

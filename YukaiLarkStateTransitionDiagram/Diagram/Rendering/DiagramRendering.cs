@@ -46,6 +46,18 @@ public partial class Game1
         }
     }
 
+    private void DrawDraggedNodeSnapGridLines(DiagramNode node, TimeSpan totalGameTime)
+    {
+        var topLeft = ScreenToWorld(Vector2.Zero);
+        var bottomRight = ScreenToWorld(new Vector2(GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height));
+        var pulse = 0.5f + (MathF.Sin((float)totalGameTime.TotalSeconds * 7.2f) * 0.5f);
+        var color = _nodeRenderer.GetNodeSnapIndicatorColor(node) * MathHelper.Lerp(0.48f, 0.72f, pulse);
+        var thickness = MathHelper.Lerp(2.2f, 3f, pulse);
+
+        _primitiveRenderer.DrawLine(new Vector2(node.Position.X, topLeft.Y), new Vector2(node.Position.X, bottomRight.Y), color, thickness);
+        _primitiveRenderer.DrawLine(new Vector2(topLeft.X, node.Position.Y), new Vector2(bottomRight.X, node.Position.Y), color, thickness);
+    }
+
     private DiagramNode? GetNodeHoverCueTarget()
     {
         if (IsEditingLabel || _isEditingFileName || _draggedNode is not null || _resizedNode is not null || _draggedHandleTransition is not null || _isPanning || _linkSource is not null)
@@ -128,6 +140,10 @@ public partial class Game1
     {
         _spriteBatch.Begin(samplerState: SamplerState.LinearClamp, transformMatrix: transformMatrix);
         DrawGrid(40, _boardTheme.GridColor);
+        if (includeInteraction && _draggedNode is not null && !IsAltDown(Keyboard.GetState()))
+        {
+            DrawDraggedNodeSnapGridLines(_draggedNode, totalGameTime);
+        }
         DrawDiagramContent(includeInteraction, totalGameTime);
         _spriteBatch.End();
     }
@@ -221,7 +237,7 @@ public partial class Game1
             var inactive = includeInteraction && IsInactiveDuringTransitionLink(node);
             _nodeRenderer.DrawNode(node, includeInteraction && node == _selectedNode, _editingNode, editingDisplayLabel, editingDisplayCaretIndex, showEditingCaret, totalGameTime, inactive, node == hoveredNode);
         }
-        if (includeInteraction && _draggedNode is not null)
+        if (includeInteraction && _draggedNode is not null && !IsAltDown(Keyboard.GetState()))
         {
             _nodeRenderer.DrawNodeSnapIndicator(_draggedNode, totalGameTime);
         }
