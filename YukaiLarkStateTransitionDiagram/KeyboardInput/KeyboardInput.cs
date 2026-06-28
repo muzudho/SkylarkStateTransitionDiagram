@@ -173,6 +173,7 @@ public partial class Game1
         _editingNode = node;
         _editingTransition = null;
         _textBoxController.Begin(node.Label);
+        BeginTextInputIme();
         _draggedNode = null;
         _resizedNode = null;
         _linkSource = null;
@@ -194,6 +195,7 @@ public partial class Game1
         _editingNode = null;
         _editingTransition = transition;
         _textBoxController.Begin(transition.Label);
+        BeginTextInputIme();
         _draggedNode = null;
         _resizedNode = null;
         _linkSource = null;
@@ -226,12 +228,14 @@ public partial class Game1
                 ? "遷移ラベルを更新しました。ラベルはドラッグで移動できます。"
                 : "開始マークから最初の状態へ入る遷移にはイベントを付けられません。";
         }
+        EndTextInputIme();
         _editingNode = null;
         _editingTransition = null;
         _textBoxController.Clear();
     }
     private void CancelLabelEdit()
     {
+        EndTextInputIme();
         _editingNode = null;
         _editingTransition = null;
         _textBoxController.Clear();
@@ -270,6 +274,7 @@ public partial class Game1
         _linkSource = null;
         _isPanning = false;
         _fileNameTextBoxController.Begin(Path.GetFileName(_currentFilePath));
+        BeginTextInputIme();
         UpdateFileNameEditWarning();
         _status = "ファイル名を編集中です。Enterで変更、Escでキャンセルします。";
     }
@@ -313,6 +318,7 @@ public partial class Game1
 
     private void CancelFileNameEdit(bool keepStatus = false)
     {
+        EndTextInputIme();
         _isEditingFileName = false;
         _fileNameTextBoxController.Clear();
         _fileNameEditWarning = string.Empty;

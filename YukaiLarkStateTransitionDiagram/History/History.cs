@@ -127,6 +127,11 @@ public partial class Game1
         }
 
         _nextNodeId = _nodes.Count == 0 ? 1 : _nodes.Max(n => n.Id) + 1;
+        if (_isEditingFileName || IsEditingLabel)
+        {
+            EndTextInputIme();
+        }
+
         _selectedNode = null;
         _selectedTransition = null;
         _draggedNode = null;

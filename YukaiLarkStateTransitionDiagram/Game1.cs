@@ -58,6 +58,7 @@ public partial class Game1 : Game
     private Vector2 _cameraOffset;
     private float _cameraZoom = 1f;
     private bool _isEditingFileName;
+    private bool _isImeEnabledForTextInput = true;
     private int _nextNodeId = 1;
     private string _status = DefaultStatus;
     private string _fileNameEditWarning = string.Empty;
@@ -104,6 +105,11 @@ public partial class Game1 : Game
     {
         var keyboard = Keyboard.GetState();
         var mouse = Mouse.GetState();
+        if (!_isEditingFileName && !IsEditingLabel)
+        {
+            EnsureImeClosedForShortcutInput();
+        }
+
         UpdateExportPhotoEffect(gameTime);
 
         if (_isFileMenuOpen)
@@ -241,6 +247,21 @@ public partial class Game1 : Game
     }
     private bool IsEditingLabel => _editingNode is not null || _editingTransition is not null;
 
+    private void BeginTextInputIme()
+    {
+        WindowsImeCompositionReader.SetOpen(_isImeEnabledForTextInput);
+    }
+
+    private void EndTextInputIme()
+    {
+        _isImeEnabledForTextInput = WindowsImeCompositionReader.IsOpen();
+        EnsureImeClosedForShortcutInput();
+    }
+
+    private static void EnsureImeClosedForShortcutInput()
+    {
+        WindowsImeCompositionReader.SetOpen(false);
+    }
     private void DrawScreenRectangleOutline(Rectangle rectangle, Color color, int thickness)
     {
         _spriteBatch.Draw(_pixel, new Rectangle(rectangle.X, rectangle.Y, rectangle.Width, thickness), color);
