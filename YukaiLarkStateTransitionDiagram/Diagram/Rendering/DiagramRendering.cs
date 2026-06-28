@@ -221,6 +221,10 @@ public partial class Game1
             var inactive = includeInteraction && IsInactiveDuringTransitionLink(node);
             _nodeRenderer.DrawNode(node, includeInteraction && node == _selectedNode, _editingNode, editingDisplayLabel, editingDisplayCaretIndex, showEditingCaret, totalGameTime, inactive, node == hoveredNode);
         }
+        if (includeInteraction && _draggedNode is not null)
+        {
+            _nodeRenderer.DrawNodeSnapIndicator(_draggedNode, totalGameTime);
+        }
         if (includeInteraction && _selectedNode is not null && !IsInactiveDuringTransitionLink(_selectedNode))
         {
             _nodeRenderer.DrawNodeResizeHandle(_selectedNode);
