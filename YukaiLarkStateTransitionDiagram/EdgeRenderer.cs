@@ -603,8 +603,8 @@ public sealed class EdgeRenderer
         foreach (var t in markerPositions)
         {
             var center = CubicBezier(start, control1, control2, end, t);
-            _primitiveRenderer.DrawCircle(center, 5.5f, Theme.SelectedTransitionLabelColor * 0.72f);
-            _primitiveRenderer.DrawCircleOutline(center, 7.5f, Theme.SelectedTransitionLineColor * 0.78f, 2f);
+            var tangent = CubicBezierTangent(start, control1, control2, end, t);
+            DrawTransitionSelectionBand(center, tangent);
         }
     }
 
@@ -712,9 +712,29 @@ public sealed class EdgeRenderer
         foreach (var t in markerPositions)
         {
             var center = GetTransitionPathPoint(points, t, segmentControls);
-            _primitiveRenderer.DrawCircle(center, 5.5f, Theme.SelectedTransitionLabelColor * 0.72f);
-            _primitiveRenderer.DrawCircleOutline(center, 7.5f, Theme.SelectedTransitionLineColor * 0.78f, 2f);
+            var tangent = GetTransitionPathTangent(points, t, segmentControls);
+            DrawTransitionSelectionBand(center, tangent);
         }
+    }
+
+    private void DrawTransitionSelectionBand(Vector2 center, Vector2 tangent)
+    {
+        if (tangent.LengthSquared() <= 0.01f)
+        {
+            return;
+        }
+
+        var direction = Vector2.Normalize(tangent);
+        var normal = new Vector2(-direction.Y, direction.X);
+        var halfLength = direction * 7f;
+        var sideOffset = normal * 12f;
+        var color = Theme.SelectedTransitionLineColor * 0.82f;
+        var shadowColor = Theme.SelectedTransitionLabelColor * 0.34f;
+
+        _primitiveRenderer.DrawLine(center - sideOffset - halfLength, center - sideOffset + halfLength, shadowColor, 5f);
+        _primitiveRenderer.DrawLine(center + sideOffset - halfLength, center + sideOffset + halfLength, shadowColor, 5f);
+        _primitiveRenderer.DrawLine(center - sideOffset - halfLength, center - sideOffset + halfLength, color, 2f);
+        _primitiveRenderer.DrawLine(center + sideOffset - halfLength, center + sideOffset + halfLength, color, 2f);
     }
 
     private static Vector2 GetTransitionPathPoint(IReadOnlyList<Vector2> points, float t, IReadOnlyList<TransitionSegmentControls>? segmentControls = null)
