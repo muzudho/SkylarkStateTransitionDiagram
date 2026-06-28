@@ -172,6 +172,7 @@ internal sealed class YukaiLarkAssistant
         TimeSpan totalGameTime,
         YukaiLarkAssistantContext context,
         BoardTheme theme,
+        IKeyCapTheme keyCapTheme,
         Rectangle avoidBounds,
         DrawRectangleOutline drawRectangleOutline,
         DrawUiText drawUiText)
@@ -197,11 +198,11 @@ internal sealed class YukaiLarkAssistant
 
         if (_completedKind != YukaiLarkAssistKind.None && _completedAssistSeconds > 0)
         {
-            DrawCompletedAssistBubble(spriteBatch, pixel, viewport, target, _completedKind, theme, drawRectangleOutline, drawUiText);
+            DrawCompletedAssistBubble(spriteBatch, pixel, viewport, target, _completedKind, theme, keyCapTheme, drawRectangleOutline, drawUiText);
         }
         else if (IsAssistReady && assistKind != YukaiLarkAssistKind.None)
         {
-            DrawAssistBubble(spriteBatch, pixel, viewport, target, assistKind, context, theme, drawRectangleOutline, drawUiText);
+            DrawAssistBubble(spriteBatch, pixel, viewport, target, assistKind, context, theme, keyCapTheme, drawRectangleOutline, drawUiText);
         }
     }
 
@@ -363,6 +364,7 @@ internal sealed class YukaiLarkAssistant
         YukaiLarkAssistKind kind,
         YukaiLarkAssistantContext context,
         BoardTheme theme,
+        IKeyCapTheme keyCapTheme,
         DrawRectangleOutline drawRectangleOutline,
         DrawUiText drawUiText)
     {
@@ -373,7 +375,7 @@ internal sealed class YukaiLarkAssistant
         spriteBatch.Draw(pixel, bubble, theme.AssistantBubbleColor);
         drawRectangleOutline(bubble, theme.AssistantBubbleBorderColor, 2);
         drawUiText(title, new Vector2(bubble.X + 12, bubble.Y + 13), theme.AssistantTitleTextColor, 17, true);
-        DrawAssistantCutIn(spriteBatch, pixel, viewport, mascotBounds, body, string.Empty, kind, theme, drawRectangleOutline, drawUiText);
+        DrawAssistantCutIn(spriteBatch, pixel, viewport, mascotBounds, body, string.Empty, kind, theme, keyCapTheme, drawRectangleOutline, drawUiText);
     }
 
     private static (string Title, string Body) GetBubbleText(YukaiLarkAssistKind kind, YukaiLarkAssistantContext context)
@@ -381,7 +383,7 @@ internal sealed class YukaiLarkAssistant
         {
             YukaiLarkAssistKind.CreateStartMarker => ("わたしの名前はユカイラークです", "開始マークを作る？ Enter または鳥をクリック"),
             YukaiLarkAssistKind.CreateStateNode => ("次の状態を作る？", "Enter または鳥をクリック"),
-            YukaiLarkAssistKind.EditStateNodeLabel => ("ノードのラベルを編集する？", $"{context.DefaultStateNodeLabelSummary} / Enter: ラベルを入力する / Esc: しない"),
+            YukaiLarkAssistKind.EditStateNodeLabel => ("ノードのラベルを編集する？", $"{context.DefaultStateNodeLabelSummary} の名前を入力できます"),
             YukaiLarkAssistKind.CreateSecondStateNode => ("2つ目の状態を作る？", "作らないときは数秒待つと次へ進みます"),
             YukaiLarkAssistKind.CreateTransition => GetTransitionBubbleText(context),
             YukaiLarkAssistKind.AddTransitionEvent => ("イベントを追加する？", $"{context.MissingTransitionEventSummary} 間の遷移"),
@@ -413,6 +415,7 @@ internal sealed class YukaiLarkAssistant
         Rectangle mascotBounds,
         YukaiLarkAssistKind kind,
         BoardTheme theme,
+        IKeyCapTheme keyCapTheme,
         DrawRectangleOutline drawRectangleOutline,
         DrawUiText drawUiText)
     {
@@ -423,7 +426,7 @@ internal sealed class YukaiLarkAssistant
         spriteBatch.Draw(pixel, bubble, theme.AssistantBubbleColor);
         drawRectangleOutline(bubble, theme.AssistantCompletedBubbleBorderColor, 2);
         drawUiText(title, new Vector2(bubble.X + 12, bubble.Y + 13), theme.AssistantTitleTextColor, 17, true);
-        DrawAssistantCutIn(spriteBatch, pixel, viewport, mascotBounds, action, hint, YukaiLarkAssistKind.None, theme, drawRectangleOutline, drawUiText);
+        DrawAssistantCutIn(spriteBatch, pixel, viewport, mascotBounds, action, hint, YukaiLarkAssistKind.None, theme, keyCapTheme, drawRectangleOutline, drawUiText);
     }
 
     private void DrawAssistantCutIn(
@@ -435,6 +438,7 @@ internal sealed class YukaiLarkAssistant
         string secondaryText,
         YukaiLarkAssistKind kind,
         BoardTheme theme,
+        IKeyCapTheme keyCapTheme,
         DrawRectangleOutline drawRectangleOutline,
         DrawUiText drawUiText)
     {
@@ -470,54 +474,89 @@ internal sealed class YukaiLarkAssistant
         }
         if (hasActionButtons)
         {
-            DrawAssistantActionButtons(spriteBatch, pixel, frame, theme, drawRectangleOutline, drawUiText);
+            DrawAssistantActionHints(spriteBatch, pixel, frame, theme, keyCapTheme, drawRectangleOutline, drawUiText);
         }
     }
 
-    private void DrawAssistantActionButtons(
+    private void DrawAssistantActionHints(
         SpriteBatch spriteBatch,
         Texture2D pixel,
         Rectangle frame,
         BoardTheme theme,
+        IKeyCapTheme keyCapTheme,
         DrawRectangleOutline drawRectangleOutline,
         DrawUiText drawUiText)
     {
-        const int gap = 10;
-        const int acceptWidth = 184;
-        const int declineWidth = 112;
-        const int height = 26;
-        var y = frame.Y + 38;
-        var x = frame.X + 18;
-        AssistAcceptButtonBounds = new Rectangle(x, y, acceptWidth, height);
-        AssistDeclineButtonBounds = new Rectangle(x + acceptWidth + gap, y, declineWidth, height);
-
-        DrawAssistantActionButton(spriteBatch, pixel, AssistAcceptButtonBounds, "Enter  ラベルを入力", true, theme, drawRectangleOutline, drawUiText);
-        DrawAssistantActionButton(spriteBatch, pixel, AssistDeclineButtonBounds, "Esc  しない", false, theme, drawRectangleOutline, drawUiText);
+        const int gap = 14;
+        var position = new Vector2(frame.X + 18, frame.Y + 38);
+        AssistAcceptButtonBounds = DrawAssistantShortcutAction(spriteBatch, pixel, position, "Enter", "ラベルを入力", true, theme, keyCapTheme, drawRectangleOutline, drawUiText);
+        position.X = AssistAcceptButtonBounds.Right + gap;
+        AssistDeclineButtonBounds = DrawAssistantShortcutAction(spriteBatch, pixel, position, "Esc", "しない", false, theme, keyCapTheme, drawRectangleOutline, drawUiText);
     }
 
-    private static void DrawAssistantActionButton(
+    private static Rectangle DrawAssistantShortcutAction(
+        SpriteBatch spriteBatch,
+        Texture2D pixel,
+        Vector2 position,
+        string key,
+        string description,
+        bool primary,
+        BoardTheme theme,
+        IKeyCapTheme keyCapTheme,
+        DrawRectangleOutline drawRectangleOutline,
+        DrawUiText drawUiText)
+    {
+        var keyWidth = Math.Max(keyCapTheme.MinWidth, GetAssistantKeyCapWidth(key, keyCapTheme));
+        var descriptionWidth = GetAssistantActionDescriptionWidth(description);
+        var bounds = new Rectangle((int)position.X - 5, (int)position.Y - 3, keyWidth + 6 + descriptionWidth + 12, keyCapTheme.Height + 6);
+        var hovered = bounds.Contains(Mouse.GetState().Position);
+
+        if (hovered)
+        {
+            spriteBatch.Draw(pixel, bounds, theme.AssistantBubbleColor * 0.88f);
+            drawRectangleOutline(bounds, primary ? theme.AssistantCompletedBubbleBorderColor : theme.AssistantBubbleBorderColor, 1);
+        }
+
+        var keyBounds = new Rectangle((int)position.X, (int)position.Y, keyWidth, keyCapTheme.Height);
+        DrawAssistantKeyCap(spriteBatch, pixel, keyBounds, key, hovered, keyCapTheme, drawUiText);
+        drawUiText(description, new Vector2(keyBounds.Right + 6, position.Y + 3), primary ? theme.AssistantCutInPrimaryTextColor : theme.AssistantCutInSecondaryTextColor, 14, false);
+        return bounds;
+    }
+
+    private static void DrawAssistantKeyCap(
         SpriteBatch spriteBatch,
         Texture2D pixel,
         Rectangle bounds,
-        string label,
-        bool primary,
-        BoardTheme theme,
-        DrawRectangleOutline drawRectangleOutline,
+        string text,
+        bool hovered,
+        IKeyCapTheme keyCapTheme,
         DrawUiText drawUiText)
     {
-        var fill = primary
-            ? theme.AssistantBubbleBorderColor * 0.56f
-            : theme.AssistantCutInFrameColor * 0.82f;
-        var border = primary
-            ? theme.AssistantCompletedBubbleBorderColor
-            : theme.AssistantBubbleBorderColor * 0.72f;
-        var text = primary
-            ? theme.AssistantCutInPrimaryTextColor
-            : theme.AssistantCutInSecondaryTextColor;
+        var face = hovered ? BlendColor(keyCapTheme.FaceColor, keyCapTheme.TopEdgeColor, 0.34f) : keyCapTheme.FaceColor;
+        var bottom = hovered ? BlendColor(keyCapTheme.BottomEdgeColor, keyCapTheme.FaceColor, 0.22f) : keyCapTheme.BottomEdgeColor;
 
-        spriteBatch.Draw(pixel, bounds, fill);
-        drawRectangleOutline(bounds, border, 1);
-        drawUiText(label, new Vector2(bounds.X + 10, bounds.Y + 4), text, 13, primary);
+        spriteBatch.Draw(pixel, bounds, face);
+        spriteBatch.Draw(pixel, new Rectangle(bounds.X, bounds.Y, bounds.Width, 1), keyCapTheme.TopEdgeColor);
+        spriteBatch.Draw(pixel, new Rectangle(bounds.X, bounds.Y, 1, bounds.Height), keyCapTheme.TopEdgeColor);
+        spriteBatch.Draw(pixel, new Rectangle(bounds.X, bounds.Bottom - 2, bounds.Width, 2), bottom);
+        spriteBatch.Draw(pixel, new Rectangle(bounds.Right - 1, bounds.Y, 1, bounds.Height), bottom);
+        spriteBatch.Draw(pixel, new Rectangle(bounds.X + 2, bounds.Y + 2, bounds.Width - 4, 1), keyCapTheme.InnerHighlightColor);
+        drawUiText(text, new Vector2(bounds.X + keyCapTheme.HorizontalPadding, bounds.Y + 4), keyCapTheme.LabelTextColor, keyCapTheme.FontSize, true);
+    }
+
+    private static int GetAssistantKeyCapWidth(string text, IKeyCapTheme keyCapTheme)
+        => Math.Max(keyCapTheme.MinWidth, (int)MathF.Ceiling(text.Length * keyCapTheme.FontSize * 0.62f) + (keyCapTheme.HorizontalPadding * 2));
+
+    private static int GetAssistantActionDescriptionWidth(string description)
+        => Math.Max(48, (int)MathF.Ceiling(description.Length * 14f));
+    private static Color BlendColor(Color from, Color to, float amount)
+    {
+        var clamped = MathHelper.Clamp(amount, 0f, 1f);
+        return new Color(
+            (byte)MathF.Round(MathHelper.Lerp(from.R, to.R, clamped)),
+            (byte)MathF.Round(MathHelper.Lerp(from.G, to.G, clamped)),
+            (byte)MathF.Round(MathHelper.Lerp(from.B, to.B, clamped)),
+            (byte)MathF.Round(MathHelper.Lerp(from.A, to.A, clamped)));
     }
     private static (string Title, string Action, string Hint) GetCompletedBubbleText(YukaiLarkAssistKind kind)
         => kind switch

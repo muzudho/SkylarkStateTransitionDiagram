@@ -389,6 +389,7 @@ public partial class Game1
             totalGameTime,
             CreateAssistantContext(),
             _boardTheme,
+            _keyCapTheme,
             GetAssistantAvoidBounds(viewport),
             DrawScreenRectangleOutline,
             DrawUiText);
