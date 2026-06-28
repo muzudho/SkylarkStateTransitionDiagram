@@ -40,6 +40,12 @@ public static class KeyCapThemes
     public static IKeyCapTheme Cloud { get; } = new CloudKeyCapTheme();
     public static IKeyCapTheme Moon { get; } = new MoonKeyCapTheme();
     public static IKeyCapTheme Star { get; } = new StarKeyCapTheme();
+    public static IKeyCapTheme PurpleGrapes { get; } = new PurpleGrapesKeyCapTheme();
+    public static IKeyCapTheme Christmas { get; } = new ChristmasKeyCapTheme();
+    public static IKeyCapTheme DyeingPoisonDartFrog { get; } = new DyeingPoisonDartFrogKeyCapTheme();
+    public static IKeyCapTheme Halloween { get; } = new HalloweenKeyCapTheme();
+    public static IKeyCapTheme Tricolore { get; } = new TricoloreKeyCapTheme();
+    public static IKeyCapTheme Okinawa { get; } = new OkinawaKeyCapTheme();
     public static IReadOnlyList<IKeyCapTheme> AllThemes { get; } =
     [
         YukaiLark,
@@ -75,7 +81,13 @@ public static class KeyCapThemes
         Sun,
         Cloud,
         Moon,
-        Star
+        Star,
+        PurpleGrapes,
+        Christmas,
+        DyeingPoisonDartFrog,
+        Halloween,
+        Tricolore,
+        Okinawa
     ];
 
     public static IReadOnlyList<IKeyCapTheme> ShortcutThemes { get; } =
@@ -92,3 +104,4 @@ public static class KeyCapThemes
         Amber
     ];
 }
+
