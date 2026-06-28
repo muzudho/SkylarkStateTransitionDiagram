@@ -173,6 +173,67 @@ public sealed class EdgeRenderer
     {
         _primitiveRenderer.DrawDiamondHandle(center, Theme.TransitionControlHandleColor, Theme.HandleOutlineColor);
     }
+    public void DrawTransitionPathRelatedHandleCue(
+        IReadOnlyList<Vector2> points,
+        IReadOnlyList<TransitionSegmentControls> segmentControls,
+        TransitionHandleKind kind,
+        int segmentIndex)
+    {
+        if (points.Count < 2
+            || segmentIndex < 0
+            || segmentIndex >= points.Count - 1
+            || kind is not (TransitionHandleKind.SegmentControlPoint1 or TransitionHandleKind.SegmentControlPoint2))
+        {
+            return;
+        }
+
+        GetTransitionPathSegmentControlPoints(points, segmentIndex, segmentControls, out var control1, out var control2);
+        var activeControl = kind == TransitionHandleKind.SegmentControlPoint1 ? control1 : control2;
+        var joint = kind == TransitionHandleKind.SegmentControlPoint1
+            ? points[segmentIndex]
+            : points[segmentIndex + 1];
+
+        _primitiveRenderer.DrawLine(joint, activeControl, Theme.SelectedTransitionLineColor * 0.85f, 3f);
+        _primitiveRenderer.DrawCircle(joint, 12f, Theme.SelectedTransitionLineColor * 0.28f);
+        _primitiveRenderer.DrawCircleOutline(joint, 15f, Theme.SelectedTransitionLineColor, 3f);
+        _primitiveRenderer.DrawDiamondHandle(activeControl, Theme.SelectedTransitionLabelColor, Theme.SelectedTransitionLineColor);
+
+        if (TryGetOppositeSegmentControlPoint(points, segmentControls, kind, segmentIndex, out var oppositeControl))
+        {
+            _primitiveRenderer.DrawLine(joint, oppositeControl, Theme.SelectedTransitionLineColor * 0.72f, 2.5f);
+            _primitiveRenderer.DrawDiamondHandle(oppositeControl, Theme.SelectedTransitionLineColor * 0.88f, Theme.SelectedTransitionLabelColor);
+        }
+    }
+
+    private static bool TryGetOppositeSegmentControlPoint(
+        IReadOnlyList<Vector2> points,
+        IReadOnlyList<TransitionSegmentControls> segmentControls,
+        TransitionHandleKind kind,
+        int segmentIndex,
+        out Vector2 oppositeControl)
+    {
+        oppositeControl = Vector2.Zero;
+        if (kind == TransitionHandleKind.SegmentControlPoint1)
+        {
+            var oppositeSegmentIndex = segmentIndex - 1;
+            if (oppositeSegmentIndex < 0)
+            {
+                return false;
+            }
+
+            GetTransitionPathSegmentControlPoints(points, oppositeSegmentIndex, segmentControls, out _, out oppositeControl);
+            return true;
+        }
+
+        var nextSegmentIndex = segmentIndex + 1;
+        if (nextSegmentIndex >= points.Count - 1)
+        {
+            return false;
+        }
+
+        GetTransitionPathSegmentControlPoints(points, nextSegmentIndex, segmentControls, out oppositeControl, out _);
+        return true;
+    }
 
     /// <summary>
     /// ベジェ曲線の矢印を描く

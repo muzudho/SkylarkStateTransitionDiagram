@@ -254,6 +254,10 @@ public partial class Game1
             if (_selectedTransition.Waypoints.Count > 0 && TryGetTransitionPath(_selectedTransition, out var points))
             {
                 _edgeRenderer.DrawTransitionPathHandles(_selectedTransition, points);
+                if (_draggedHandleTransition == _selectedTransition)
+                {
+                    _edgeRenderer.DrawTransitionPathRelatedHandleCue(points, _selectedTransition.SegmentControls, _draggedHandleKind, _draggedWaypointIndex);
+                }
             }
             else if (TryGetTransitionGeometry(_selectedTransition, out var start, out var control1, out var control2, out var end))
             {
