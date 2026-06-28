@@ -88,9 +88,9 @@ public sealed record BoardTheme(
         : WithAlpha(Blend(TransitionLineColor, PhotoPaperColor, 0.18f), 238);
     public Color StartMarkerFillColor => ToneMarkerColor(PinColor);
     public Color EndMarkerFillColor => ToneMarkerColor(SelectedTransitionLineColor);
-    public Color MarkerOutlineColor => IsLightBackground
-        ? WithAlpha(TransitionLineColor, 245)
-        : WithAlpha(PhotoPaperColor, 245);
+    public Color StartMarkerOutlineColor => GetMarkerOutlineColor(StartMarkerFillColor);
+    public Color EndMarkerOutlineColor => GetMarkerOutlineColor(EndMarkerFillColor);
+    public Color MarkerOutlineColor => GetMarkerOutlineColor(Blend(StartMarkerFillColor, EndMarkerFillColor, 0.5f));
     public Color NodeLabelTextColor => IsLightBackground
         ? PhotoPaperColor
         : WithAlpha(PhotoPaperColor, 248);
@@ -174,6 +174,20 @@ public sealed record BoardTheme(
         => IsLightBackground
             ? WithAlpha(Blend(color, Color.Black, 0.48f), 248)
             : WithAlpha(Blend(color, PhotoPaperColor, 0.18f), 248);
+
+    private Color GetMarkerOutlineColor(Color fillColor)
+    {
+        var preferred = IsLightBackground ? WithAlpha(TransitionLineColor, 245) : WithAlpha(PhotoPaperColor, 245);
+        if (MathF.Abs(GetLuminance(fillColor) - GetLuminance(preferred)) >= 0.30f)
+        {
+            return preferred;
+        }
+
+        var fallback = GetLuminance(fillColor) >= 0.50f
+            ? Blend(Color.Black, TransitionLabelColor, IsLightBackground ? 0.08f : 0.18f)
+            : Blend(Color.White, PhotoPaperColor, IsLightBackground ? 0.10f : 0.22f);
+        return WithAlpha(fallback, 245);
+    }
 
     private static Color ToneNormalNodeColor(Color color, Color backgroundColor, Color photoPaperColor, bool isLightBackground)
     {

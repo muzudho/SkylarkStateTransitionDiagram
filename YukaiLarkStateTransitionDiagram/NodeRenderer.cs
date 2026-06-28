@@ -47,7 +47,13 @@ public sealed class NodeRenderer
         var outerColor = inactive
             ? GetInactiveColor(selected ? Theme.SelectedNodeOuterRingColor : Theme.NodeOuterRingColor, 0.52f)
             : selected ? Theme.SelectedNodeOuterRingColor : Theme.NodeOuterRingColor;
-        var outlineColor = inactive ? GetInactiveColor(Theme.MarkerOutlineColor, 0.56f) : Theme.MarkerOutlineColor;
+        var markerOutlineColor = node.Kind switch
+        {
+            NodeKind.StartMarker => Theme.StartMarkerOutlineColor,
+            NodeKind.EndMarker => Theme.EndMarkerOutlineColor,
+            _ => Theme.MarkerOutlineColor
+        };
+        var outlineColor = inactive ? GetInactiveColor(markerOutlineColor, 0.56f) : markerOutlineColor;
         var normalOutlineColor = inactive ? GetInactiveColor(Theme.NormalNodeOutlineColor, 0.56f) : Theme.NormalNodeOutlineColor;
         var labelColor = GetNodeLabelColor(baseFill, inactive);
 
@@ -107,7 +113,7 @@ public sealed class NodeRenderer
         _primitiveRenderer.DrawCircle(node.Position, node.Radius + 8f, Theme.NodeGhostHaloColor * (alpha * 0.32f));
         _primitiveRenderer.DrawCircle(node.Position, node.Radius + 4f, Theme.NodeGhostInnerHaloColor * (alpha * 0.34f));
         _primitiveRenderer.DrawCircle(node.Position, node.Radius, Theme.StartMarkerFillColor * (alpha * 0.46f));
-        _primitiveRenderer.DrawCircleOutline(node.Position, node.Radius - 1f, Theme.MarkerOutlineColor * (alpha * 0.74f), 5f);
+        _primitiveRenderer.DrawCircleOutline(node.Position, node.Radius - 1f, Theme.StartMarkerOutlineColor * (alpha * 0.74f), 5f);
         DrawNodeLabel(node.Label, node.Position, editing: false, GetNodeLabelColor(Theme.StartMarkerFillColor, inactive: false) * (alpha * 0.74f));
     }
 
