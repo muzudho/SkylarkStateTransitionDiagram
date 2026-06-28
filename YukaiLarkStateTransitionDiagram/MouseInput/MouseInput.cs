@@ -498,7 +498,15 @@ public partial class Game1
                 transition.ControlPoint2.HasValue,
                 control1 - source.Position,
                 control2 - target.Position,
-                transition.Waypoints.Select(waypoint => waypoint - node.Position).ToList()));
+                transition.Waypoints.Select(waypoint => waypoint - node.Position).ToList(),
+                transition.Waypoints.ToList(),
+                transition.SegmentControls
+                    .Select(controls => new TransitionSegmentControlDragSnapshot(
+                        controls.ControlPoint1.HasValue,
+                        controls.ControlPoint2.HasValue,
+                        controls.ControlPoint1 ?? Vector2.Zero,
+                        controls.ControlPoint2 ?? Vector2.Zero))
+                    .ToList()));
         }
     }
 
@@ -530,6 +538,7 @@ public partial class Game1
                 {
                     snapshot.Transition.Waypoints[i] = draggedNode.Position + snapshot.WaypointOffsets[i];
                 }
+                MoveTransitionSegmentControlPoints(snapshot, delta, delta);
                 continue;
             }
 
@@ -545,9 +554,46 @@ public partial class Game1
             {
                 snapshot.Transition.ControlPoint2 = target.Position + Rotate(snapshot.ControlPoint2Offset, targetDelta);
             }
-            if (snapshot.Transition.SourceId == draggedNode.Id && snapshot.Transition.TargetId == draggedNode.Id)
+            var sourceMove = source.Position - snapshot.SourcePosition;
+            var targetMove = target.Position - snapshot.TargetPosition;
+            MoveTransitionWaypoints(snapshot, sourceMove, targetMove);
+            MoveTransitionSegmentControlPoints(snapshot, sourceMove, targetMove);
+        }
+    }
+
+    private static void MoveTransitionWaypoints(TransitionNodeDragSnapshot snapshot, Vector2 sourceMove, Vector2 targetMove)
+    {
+        var transition = snapshot.Transition;
+        var waypointCount = Math.Min(transition.Waypoints.Count, snapshot.WaypointPositions.Count);
+        for (var i = 0; i < waypointCount; i++)
+        {
+            var t = (i + 1f) / (waypointCount + 1f);
+            transition.Waypoints[i] = snapshot.WaypointPositions[i] + Vector2.Lerp(sourceMove, targetMove, t);
+        }
+    }
+
+    private static void MoveTransitionSegmentControlPoints(TransitionNodeDragSnapshot snapshot, Vector2 sourceMove, Vector2 targetMove)
+    {
+        var transition = snapshot.Transition;
+        var segmentCount = Math.Min(transition.SegmentControls.Count, snapshot.SegmentControlSnapshots.Count);
+        if (segmentCount == 0)
+        {
+            return;
+        }
+
+        for (var i = 0; i < segmentCount; i++)
+        {
+            var controls = transition.SegmentControls[i];
+            var snapshotControls = snapshot.SegmentControlSnapshots[i];
+            if (snapshotControls.HasControlPoint1)
             {
-                continue;
+                var t = (i + 1f / 3f) / segmentCount;
+                controls.ControlPoint1 = snapshotControls.ControlPoint1 + Vector2.Lerp(sourceMove, targetMove, t);
+            }
+            if (snapshotControls.HasControlPoint2)
+            {
+                var t = (i + 2f / 3f) / segmentCount;
+                controls.ControlPoint2 = snapshotControls.ControlPoint2 + Vector2.Lerp(sourceMove, targetMove, t);
             }
         }
     }

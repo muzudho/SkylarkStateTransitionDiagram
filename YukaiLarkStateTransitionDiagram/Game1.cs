@@ -574,7 +574,14 @@ public sealed record TransitionNodeDragSnapshot(
     bool HasControlPoint2,
     Vector2 ControlPoint1Offset,
     Vector2 ControlPoint2Offset,
-    List<Vector2> WaypointOffsets);
+    List<Vector2> WaypointOffsets,
+    List<Vector2> WaypointPositions,
+    List<TransitionSegmentControlDragSnapshot> SegmentControlSnapshots);
+public sealed record TransitionSegmentControlDragSnapshot(
+    bool HasControlPoint1,
+    bool HasControlPoint2,
+    Vector2 ControlPoint1,
+    Vector2 ControlPoint2);
 public sealed record TransitionHandleHit(DiagramTransition? Transition, TransitionHandleKind Kind, int WaypointIndex = -1);
 public enum TransitionHandleKind
 {
