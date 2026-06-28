@@ -21,6 +21,8 @@ internal sealed class YukaiLarkAssistant
     private YukaiLarkAssistKind _completedKind;
     private bool _skipSecondStateNode;
 
+    private readonly record struct AssistantActionHint(string Key, string Description, bool Primary, bool Suppresses);
+
     public Rectangle MascotBounds { get; private set; }
     public Rectangle CutInBandBounds { get; private set; }
     public Rectangle AssistAcceptButtonBounds { get; private set; }
@@ -104,7 +106,7 @@ internal sealed class YukaiLarkAssistant
     public bool ShouldSuppressFromMouse(YukaiLarkAssistantContext context, Point mousePosition, out YukaiLarkAssistKind kind)
     {
         kind = GetRunnableAssistKind(context);
-        return kind == YukaiLarkAssistKind.EditStateNodeLabel
+        return CanSuppressAssistFromActionHint(kind, context)
             && AssistDeclineButtonBounds.Contains(mousePosition);
     }
 
@@ -330,13 +332,13 @@ internal sealed class YukaiLarkAssistant
         => kind switch
         {
             YukaiLarkAssistKind.CreateStartMarker => "ユカイラーク: わたしの名前はユカイラークです。開始マークを作れます。",
-            YukaiLarkAssistKind.CreateStateNode => "ユカイラーク: 次の状態ノードを作れます。Enterか鳥をクリック。",
-            YukaiLarkAssistKind.EditStateNodeLabel => $"ユカイラーク: {context.DefaultStateNodeLabelSummary} のラベルを編集しますか？ Enterか鳥をクリック。",
+            YukaiLarkAssistKind.CreateStateNode => "ユカイラーク: 次の状態ノードを作れます。",
+            YukaiLarkAssistKind.EditStateNodeLabel => $"ユカイラーク: {context.DefaultStateNodeLabelSummary} のラベルを編集しますか？",
             YukaiLarkAssistKind.CreateSecondStateNode => "ユカイラーク: 通常ノード同士の遷移例用に、2つ目の状態を作れます。",
             YukaiLarkAssistKind.CreateTransition => GetTransitionStatusText(context),
-            YukaiLarkAssistKind.AddTransitionEvent => $"ユカイラーク: {context.MissingTransitionEventSummary} 間の遷移にイベントがありません。Enterか鳥をクリック。",
-            YukaiLarkAssistKind.ShiftDiagramLeft => "ユカイラーク: 図が右に寄ってきたぜ。Enterか鳥クリックで左に寄せます。",
-            YukaiLarkAssistKind.CreateEndMarker => "ユカイラーク: 終了マークがまだありません。Enterか鳥をクリック。",
+            YukaiLarkAssistKind.AddTransitionEvent => $"ユカイラーク: {context.MissingTransitionEventSummary} 間の遷移にイベントがありません。",
+            YukaiLarkAssistKind.ShiftDiagramLeft => "ユカイラーク: 図が右に寄ってきたぜ。左に寄せられます。",
+            YukaiLarkAssistKind.CreateEndMarker => "ユカイラーク: 終了マークがまだありません。",
             YukaiLarkAssistKind.ConnectUnreachedStateNode => "ユカイラーク: 入ってくる遷移がない通常ノードがあります。近くのノードからつなげますか？",
             _ => string.Empty
         };
@@ -345,15 +347,15 @@ internal sealed class YukaiLarkAssistant
     {
         if (!context.HasStartToNormalTransition)
         {
-            return "ユカイラーク: 開始から次の状態へ遷移を作れます。Enterか鳥をクリック。";
+            return "ユカイラーク: 開始から次の状態へ遷移を作れます。";
         }
 
         if (context.NormalNodeCount >= 2 && !context.HasNormalToNormalTransition)
         {
-            return "ユカイラーク: 通常ノード同士の遷移をつなげます。Enterか鳥をクリック。";
+            return "ユカイラーク: 通常ノード同士の遷移をつなげます。";
         }
 
-        return "ユカイラーク: 開始から一番遠い状態から終了マークへ遷移をつなげます。Enterか鳥クリックでつなぐ、Escでつながない。";
+        return "ユカイラーク: 開始から一番遠い状態から終了マークへ遷移をつなげます。";
     }
 
     private void DrawAssistBubble(
@@ -375,21 +377,21 @@ internal sealed class YukaiLarkAssistant
         spriteBatch.Draw(pixel, bubble, theme.AssistantBubbleColor);
         drawRectangleOutline(bubble, theme.AssistantBubbleBorderColor, 2);
         drawUiText(title, new Vector2(bubble.X + 12, bubble.Y + 13), theme.AssistantTitleTextColor, 17, true);
-        DrawAssistantCutIn(spriteBatch, pixel, viewport, mascotBounds, body, string.Empty, kind, theme, keyCapTheme, drawRectangleOutline, drawUiText);
+        DrawAssistantCutIn(spriteBatch, pixel, viewport, mascotBounds, body, string.Empty, kind, context, theme, keyCapTheme, drawRectangleOutline, drawUiText);
     }
 
     private static (string Title, string Body) GetBubbleText(YukaiLarkAssistKind kind, YukaiLarkAssistantContext context)
         => kind switch
         {
-            YukaiLarkAssistKind.CreateStartMarker => ("わたしの名前はユカイラークです", "開始マークを作る？ Enter または鳥をクリック"),
-            YukaiLarkAssistKind.CreateStateNode => ("次の状態を作る？", "Enter または鳥をクリック"),
+            YukaiLarkAssistKind.CreateStartMarker => ("わたしの名前はユカイラークです", "開始マークを作る？"),
+            YukaiLarkAssistKind.CreateStateNode => ("次の状態を作る？", "状態ノードを追加できます"),
             YukaiLarkAssistKind.EditStateNodeLabel => ("ノードのラベルを編集する？", $"{context.DefaultStateNodeLabelSummary} の名前を入力できます"),
             YukaiLarkAssistKind.CreateSecondStateNode => ("2つ目の状態を作る？", "作らないときは数秒待つと次へ進みます"),
             YukaiLarkAssistKind.CreateTransition => GetTransitionBubbleText(context),
             YukaiLarkAssistKind.AddTransitionEvent => ("イベントを追加する？", $"{context.MissingTransitionEventSummary} 間の遷移"),
             YukaiLarkAssistKind.ShiftDiagramLeft => ("図を左に寄せる？", "作業スペースを広げるぜ"),
-            YukaiLarkAssistKind.CreateEndMarker => ("終了マークを作る？", "Enter または鳥をクリック"),
-            YukaiLarkAssistKind.ConnectUnreachedStateNode => ("近くのノードからつなげる？", "Enter または鳥をクリック"),
+            YukaiLarkAssistKind.CreateEndMarker => ("終了マークを作る？", "終了位置を明示できます"),
+            YukaiLarkAssistKind.ConnectUnreachedStateNode => ("近くのノードからつなげる？", "入ってくる遷移を追加できます"),
             _ => (string.Empty, string.Empty)
         };
 
@@ -397,15 +399,15 @@ internal sealed class YukaiLarkAssistant
     {
         if (!context.HasStartToNormalTransition)
         {
-            return ("遷移をつなぐ？", "Enter または鳥をクリック");
+            return ("遷移をつなぐ？", "開始から次の状態へつなげます");
         }
 
         if (context.NormalNodeCount >= 2 && !context.HasNormalToNormalTransition)
         {
-            return ("通常ノード同士をつなぐ？", "Enter または鳥をクリック");
+            return ("通常ノード同士をつなぐ？", "状態の流れを追加できます");
         }
 
-        return ("終了マークへつなぐ？", "Enterでつなぐ / Escでつながない");
+        return ("終了マークへつなぐ？", "この図では提案を見送ることもできます");
     }
 
     private void DrawCompletedAssistBubble(
@@ -426,7 +428,7 @@ internal sealed class YukaiLarkAssistant
         spriteBatch.Draw(pixel, bubble, theme.AssistantBubbleColor);
         drawRectangleOutline(bubble, theme.AssistantCompletedBubbleBorderColor, 2);
         drawUiText(title, new Vector2(bubble.X + 12, bubble.Y + 13), theme.AssistantTitleTextColor, 17, true);
-        DrawAssistantCutIn(spriteBatch, pixel, viewport, mascotBounds, action, hint, YukaiLarkAssistKind.None, theme, keyCapTheme, drawRectangleOutline, drawUiText);
+        DrawAssistantCutIn(spriteBatch, pixel, viewport, mascotBounds, action, hint, YukaiLarkAssistKind.None, default, theme, keyCapTheme, drawRectangleOutline, drawUiText);
     }
 
     private void DrawAssistantCutIn(
@@ -437,6 +439,7 @@ internal sealed class YukaiLarkAssistant
         string primaryText,
         string secondaryText,
         YukaiLarkAssistKind kind,
+        YukaiLarkAssistantContext context,
         BoardTheme theme,
         IKeyCapTheme keyCapTheme,
         DrawRectangleOutline drawRectangleOutline,
@@ -448,7 +451,8 @@ internal sealed class YukaiLarkAssistant
         }
 
         var hasSecondaryText = !string.IsNullOrWhiteSpace(secondaryText);
-        var hasActionButtons = kind == YukaiLarkAssistKind.EditStateNodeLabel;
+        var actionHints = GetAssistantActionHints(kind, context);
+        var hasActionButtons = actionHints.Length > 0;
         var bandHeight = hasActionButtons ? 86 : hasSecondaryText ? 76 : 56;
         var preferredY = Math.Max(mascotBounds.Bottom + 16, (int)(viewport.Height * 0.72f));
         var y = Math.Clamp(preferredY, 86, viewport.Height - bandHeight - 72);
@@ -474,7 +478,7 @@ internal sealed class YukaiLarkAssistant
         }
         if (hasActionButtons)
         {
-            DrawAssistantActionHints(spriteBatch, pixel, frame, theme, keyCapTheme, drawRectangleOutline, drawUiText);
+            DrawAssistantActionHints(spriteBatch, pixel, frame, actionHints, theme, keyCapTheme, drawRectangleOutline, drawUiText);
         }
     }
 
@@ -482,6 +486,7 @@ internal sealed class YukaiLarkAssistant
         SpriteBatch spriteBatch,
         Texture2D pixel,
         Rectangle frame,
+        AssistantActionHint[] actionHints,
         BoardTheme theme,
         IKeyCapTheme keyCapTheme,
         DrawRectangleOutline drawRectangleOutline,
@@ -489,10 +494,65 @@ internal sealed class YukaiLarkAssistant
     {
         const int gap = 14;
         var position = new Vector2(frame.X + 18, frame.Y + 38);
-        AssistAcceptButtonBounds = DrawAssistantShortcutAction(spriteBatch, pixel, position, "Enter", "ラベルを入力", true, theme, keyCapTheme, drawRectangleOutline, drawUiText);
-        position.X = AssistAcceptButtonBounds.Right + gap;
-        AssistDeclineButtonBounds = DrawAssistantShortcutAction(spriteBatch, pixel, position, "Esc", "しない", false, theme, keyCapTheme, drawRectangleOutline, drawUiText);
+        foreach (var actionHint in actionHints)
+        {
+            var bounds = DrawAssistantShortcutAction(spriteBatch, pixel, position, actionHint.Key, actionHint.Description, actionHint.Primary, theme, keyCapTheme, drawRectangleOutline, drawUiText);
+            if (actionHint.Suppresses)
+            {
+                AssistDeclineButtonBounds = bounds;
+            }
+            else
+            {
+                AssistAcceptButtonBounds = bounds;
+            }
+
+            position.X = bounds.Right + gap;
+        }
     }
+
+    private static AssistantActionHint[] GetAssistantActionHints(YukaiLarkAssistKind kind, YukaiLarkAssistantContext context)
+    {
+        var acceptDescription = GetAcceptActionDescription(kind, context);
+        if (string.IsNullOrEmpty(acceptDescription))
+        {
+            return Array.Empty<AssistantActionHint>();
+        }
+
+        return CanSuppressAssistFromActionHint(kind, context)
+            ? new[]
+            {
+                new AssistantActionHint("Enter", acceptDescription, true, false),
+                new AssistantActionHint("Esc", GetSuppressActionDescription(kind, context), false, true)
+            }
+            : new[]
+            {
+                new AssistantActionHint("Enter", acceptDescription, true, false)
+            };
+    }
+
+    private static bool CanSuppressAssistFromActionHint(YukaiLarkAssistKind kind, YukaiLarkAssistantContext context)
+        => kind == YukaiLarkAssistKind.EditStateNodeLabel
+            || kind == YukaiLarkAssistKind.CreateTransition && context.IsNormalToEndTransitionSuggestion;
+
+    private static string GetAcceptActionDescription(YukaiLarkAssistKind kind, YukaiLarkAssistantContext context)
+        => kind switch
+        {
+            YukaiLarkAssistKind.CreateStartMarker => "開始マークを作る",
+            YukaiLarkAssistKind.CreateStateNode => "状態を作る",
+            YukaiLarkAssistKind.EditStateNodeLabel => "ラベルを入力",
+            YukaiLarkAssistKind.CreateSecondStateNode => "2つ目を作る",
+            YukaiLarkAssistKind.CreateTransition => context.IsNormalToEndTransitionSuggestion ? "つなぐ" : "遷移を作る",
+            YukaiLarkAssistKind.AddTransitionEvent => "イベントを入力",
+            YukaiLarkAssistKind.ShiftDiagramLeft => "左に寄せる",
+            YukaiLarkAssistKind.CreateEndMarker => "終了マークを作る",
+            YukaiLarkAssistKind.ConnectUnreachedStateNode => "つなげる",
+            _ => string.Empty
+        };
+
+    private static string GetSuppressActionDescription(YukaiLarkAssistKind kind, YukaiLarkAssistantContext context)
+        => kind == YukaiLarkAssistKind.CreateTransition && context.IsNormalToEndTransitionSuggestion
+            ? "つながない"
+            : "しない";
 
     private static Rectangle DrawAssistantShortcutAction(
         SpriteBatch spriteBatch,
