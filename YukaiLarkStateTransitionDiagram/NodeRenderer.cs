@@ -78,7 +78,7 @@ public sealed class NodeRenderer
         // 通常ノード
         if (node.Kind == NodeKind.Normal)
         {
-            DrawNodeOutlineCircle(node.Position, node.Radius, normalOutlineColor, 3f, drawHoveredOutline, totalGameTime);
+            DrawNodeOutlineCircle(node.Position, node.Radius, normalOutlineColor, 3f, drawHoveredOutline, totalGameTime, hoverThickness: 4.5f);
         }
         // 開始マーク
         else if (node.Kind == NodeKind.StartMarker)
@@ -189,11 +189,11 @@ public sealed class NodeRenderer
         return Blend(fill, Theme.SelectedTransitionLineColor, 0.44f);
     }
 
-    private void DrawNodeOutlineCircle(Vector2 center, float radius, Color color, float thickness, bool hovered, TimeSpan totalGameTime, float amplitude = 2.1f)
+    private void DrawNodeOutlineCircle(Vector2 center, float radius, Color color, float thickness, bool hovered, TimeSpan totalGameTime, float amplitude = 2.1f, float? hoverThickness = null)
     {
         if (hovered)
         {
-            DrawWobblingCircle(center, radius, color, thickness, totalGameTime, amplitude);
+            DrawWobblingCircle(center, radius, color, hoverThickness ?? thickness, totalGameTime, amplitude);
             return;
         }
 
