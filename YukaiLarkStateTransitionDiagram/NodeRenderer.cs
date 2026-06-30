@@ -62,7 +62,12 @@ public sealed class NodeRenderer
             DrawSelectedNodeGlow(node, totalGameTime);
         }
 
-        _primitiveRenderer.DrawCircle(node.Position, node.Radius + 4, outerColor);
+        var hideBaseOuterRing = node.Kind == NodeKind.Normal && hovered && !inactive;
+        if (!hideBaseOuterRing)
+        {
+            _primitiveRenderer.DrawCircle(node.Position, node.Radius + 4, outerColor);
+        }
+
         _primitiveRenderer.DrawCircle(node.Position, node.Radius, fill);
         if (selected && !inactive)
         {
